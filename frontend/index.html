@@ -25,10 +25,44 @@
     .card { background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
     .card h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 1rem; color: #1e293b; display: flex; align-items: center; gap: 0.5rem; }
     
-    .form-group { margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
+    .form-group { margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 0.4rem; }
     label { font-size: 0.85rem; font-weight: 600; color: #475569; }
     input[type="text"], select, textarea { padding: 0.75rem; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; font-family: inherit; width: 100%; }
-    textarea { resize: vertical; min-height: 110px; }
+    textarea { resize: vertical; min-height: 120px; }
+    
+    /* File Upload Drag & Drop Area */
+    .file-dropzone {
+      border: 2px dashed #94a3b8;
+      border-radius: 10px;
+      padding: 1.5rem;
+      text-align: center;
+      background: #f8fafc;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 1rem;
+    }
+    .file-dropzone:hover, .file-dropzone.dragover {
+      border-color: var(--primary);
+      background: #eff6ff;
+    }
+    .drop-icon { font-size: 2.2rem; margin-bottom: 0.5rem; display: block; }
+    .drop-title { font-weight: 700; font-size: 1rem; color: #1e293b; margin-bottom: 0.25rem; }
+    .drop-sub { font-size: 0.82rem; color: #64748b; }
+    .file-input-hidden { display: none; }
+    
+    .file-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #dbeafe;
+      color: #1e40af;
+      padding: 0.4rem 0.85rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 0.5rem;
+    }
+    .file-badge .remove-btn { cursor: pointer; color: #ef4444; font-weight: bold; margin-left: 0.4rem; }
     
     .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
     
@@ -74,12 +108,33 @@
   <main class="container">
     <div class="card">
       <h3>📥 Documento Técnico de Entrada</h3>
+      
+      <!-- Zona de Carga de Archivo (PDF / Markdown / Texto) -->
+      <div 
+        class="file-dropzone" 
+        id="dropzone"
+        onclick="document.getElementById('fileInput').click()"
+      >
+        <span class="drop-icon">📄</span>
+        <div class="drop-title">Haz clic o arrastra aquí un archivo (PDF, Markdown o TXT)</div>
+        <div class="drop-sub">Formatos soportados: <strong>.pdf</strong>, <strong>.md</strong>, <strong>.markdown</strong>, <strong>.txt</strong></div>
+        <input 
+          type="file" 
+          id="fileInput" 
+          class="file-input-hidden" 
+          accept=".pdf,.md,.markdown,.txt" 
+          onchange="handleFileSelect(event)"
+        />
+        <div id="fileInfoBadge" style="display:none;"></div>
+      </div>
+
       <div class="form-group">
         <label for="docTitulo">Título del Documento:</label>
         <input type="text" id="docTitulo" value="Introduccion a la Arquitectura de Redes VCN en OCI">
       </div>
+
       <div class="form-group">
-        <label for="docContenido">Contenido Técnico (PDF / Markdown / Texto):</label>
+        <label for="docContenido">Contenido Técnico Extraído (Editable):</label>
         <textarea id="docContenido">La Virtual Cloud Network (VCN) es una red privada y personalizable configurada en Oracle Cloud Infrastructure. Similar a una red de centro de datos tradicional, la VCN ofrece control total sobre su entorno de red, incluyendo subredes publicas y privadas, tablas de enrutamiento, Internet Gateways, NAT Gateways y Security Lists para control de trafico mediante reglas de entrada (ingress) y salida (egress).</textarea>
       </div>
     </div>
@@ -125,8 +180,8 @@
 
     <div class="loading-state" id="loadingState">
       <div class="spinner"></div>
-      <p><strong>Ejecutando Pipeline Agéntico...</strong></p>
-      <p style="font-size:0.85rem; color:#64748b; margin-top:0.4rem;">Parsing AST $\rightarrow$ Graph RAG $\rightarrow$ Búsqueda Híbrida BM25+Embedding $\rightarrow$ Gemeni 1.5 Pro</p>
+      <p><strong id="loadingStatusText">Ejecutando Pipeline Agéntico...</strong></p>
+      <p style="font-size:0.85rem; color:#64748b; margin-top:0.4rem;">Parsing AST $\rightarrow$ Graph RAG $\rightarrow$ Búsqueda Híbrida BM25+Embedding $\rightarrow$ Gemini 1.5 Pro</p>
     </div>
 
     <div id="resultsSection">
@@ -170,9 +225,96 @@
   </main>
 
   <script>
+    // Configurar Drag & Drop en la Dropzone
+    const dropzone = document.getElementById('dropzone');
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add('dragover');
+      }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('dragover');
+      }, false);
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files.length > 0) {
+        processFile(files[0]);
+      }
+    });
+
+    function handleFileSelect(event) {
+      const files = event.target.files;
+      if (files.length > 0) {
+        processFile(files[0]);
+      }
+    }
+
+    async function processFile(file) {
+      const badge = document.getElementById('fileInfoBadge');
+      badge.style.display = 'inline-flex';
+      badge.className = 'file-badge';
+      badge.innerHTML = `📄 ${file.name} (${Math.round(file.size/1024)} KB) <span class="remove-btn" onclick="clearFile(event)">✕</span>`;
+
+      // Auto-completar título desde el nombre del archivo
+      const cleanTitle = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+      document.getElementById('docTitulo').value = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
+
+      const ext = file.name.split('.').pop().toLowerCase();
+
+      if (ext === 'txt' || ext === 'md' || ext === 'markdown') {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          document.getElementById('docContenido').value = e.target.result;
+        };
+        reader.readAsText(file);
+      } else if (ext === 'pdf') {
+        // Enviar archivo al backend FastAPI para extracción PDF
+        const loading = document.getElementById('loadingState');
+        const loadingText = document.getElementById('loadingStatusText');
+        loadingText.innerText = "Extrayendo texto del archivo PDF...";
+        loading.style.display = 'block';
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+          const res = await fetch('http://localhost:8000/api/v1/parse-pdf', {
+            method: 'POST',
+            body: formData
+          });
+          const data = await res.json();
+          loading.style.display = 'none';
+          if (data.texto_extraido) {
+            document.getElementById('docContenido').value = data.texto_extraido;
+          }
+        } catch (err) {
+          loading.style.display = 'none';
+          alert('Error al extraer texto del PDF. Verifica que el servidor esté activo.');
+        }
+      }
+    }
+
+    function clearFile(event) {
+      event.stopPropagation();
+      document.getElementById('fileInput').value = '';
+      document.getElementById('fileInfoBadge').style.display = 'none';
+    }
+
     async function generarAdaptacion() {
       const loading = document.getElementById('loadingState');
       const results = document.getElementById('resultsSection');
+      const loadingText = document.getElementById('loadingStatusText');
+      loadingText.innerText = "Ejecutando Pipeline Agéntico Gemini...";
       
       loading.style.display = 'block';
       results.style.display = 'none';
