@@ -1,0 +1,20 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# Node modules
+node_modules/
+dist/
+.angular/
+
+# Environment and credentials
+.env
+*.pem
+~/.oci/config
+
+# Mock storage
+storage_mock/
