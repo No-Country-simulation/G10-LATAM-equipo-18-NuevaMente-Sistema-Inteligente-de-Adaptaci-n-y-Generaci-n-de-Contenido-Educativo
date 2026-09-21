@@ -1,7 +1,7 @@
 import os
-from pydantic_settings import BaseSettings
+from pydantic import BaseModel
 
-class Settings(BaseSettings):
+class Settings(BaseModel):
     PROJECT_NAME: str = "NuevaMente - API de Adaptación Educativa"
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
@@ -21,8 +21,6 @@ class Settings(BaseSettings):
     MAX_TOP_K_CHUNKS: int = 5
     RRF_DENSE_WEIGHT: float = 0.6
     RRF_SPARSE_WEIGHT: float = 0.4
-    
-    class Config:
-        case_sensitive = True
 
 settings = Settings()
+
