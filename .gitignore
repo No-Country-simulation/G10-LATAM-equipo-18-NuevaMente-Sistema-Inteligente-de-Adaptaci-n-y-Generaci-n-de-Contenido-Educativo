@@ -1,20 +1,62 @@
-# Byte-compiled / optimized files
+# ==========================================
+# Environment Variables & Credentials (CRITICAL)
+# ==========================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+oci_config
+*.oci/
+~/.oci/config
+
+# ==========================================
+# Python / Backend
+# ==========================================
 __pycache__/
 *.py[cod]
 *$py.class
-venv/
 .venv/
+venv/
+ENV/
 env/
-
-# Node modules
-node_modules/
-dist/
-.angular/
-
-# Environment and credentials
-.env
-*.pem
-~/.oci/config
-
-# Mock storage
+*.sqldb
 storage_mock/
+
+# Temporary data, uploads, and local results
+backend/local_storage/
+backend/uploads/
+data/uploads/
+data/results/
+
+# Vector Stores (FAISS, Chroma, etc.)
+chroma_db/
+faiss_index/
+.chroma/
+
+# Exclude large document binaries except test samples
+*.pdf
+!backend/tests/manual/sample_docs/*.pdf
+!tests/manual/sample_docs/*.pdf
+
+# ==========================================
+# Node / Frontend (Angular / Next)
+# ==========================================
+node_modules/
+frontend/node_modules/
+.angular/
+dist/
+out/
+build/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ==========================================
+# OS & IDEs
+# ==========================================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
