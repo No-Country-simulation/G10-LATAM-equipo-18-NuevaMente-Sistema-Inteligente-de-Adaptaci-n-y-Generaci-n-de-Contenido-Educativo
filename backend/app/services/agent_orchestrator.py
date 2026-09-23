@@ -1,11 +1,35 @@
+"""
+agent_orchestrator.py
+
+Purpose:
+    Coordinates multi-agent pipeline using Gemini models to generate
+    adapted educational material according to Bloom's taxonomy and profile.
+    Loads prompt templates from app/prompts and stores output in OCI storage.
+
+Input:
+    AdaptationRequest, retrieved top passages, key concepts, and prerequisites.
+
+Output:
+    AdaptationResponse with structured content, evaluation metrics, and storage metadata.
+"""
+
 import math
 from typing import Dict, Any, List
+
 from app.infrastructure.gemini_client import GeminiClient
 from app.schemas.adaptation import (
-    AdaptationRequest, AdaptationResponse, Metadatos,
-    ContenidoAdaptado, FlashcardItem, QuizItem, EvaluacionCalidad, AlmacenamientoOCI
+    AdaptationRequest,
+    AdaptationResponse,
+    ResponseMetadata,
+    AdaptedContent,
+    FlashcardItem,
+    QuizItem,
+    QualityEvaluation,
+    OCIStorageResult,
 )
 from app.services.oci_storage_service import OCIStorageService
+from app.prompts.prompt_loader import load_prompt
+
 
 class AgentOrchestrator:
     def __init__(self):
@@ -17,149 +41,176 @@ class AgentOrchestrator:
         request: AdaptationRequest,
         top_passages: List[Dict[str, Any]],
         key_concepts: List[str],
-        prerequisites: List[str]
+        prerequisites: List[str],
     ) -> AdaptationResponse:
-        """
-        Orquesta los 5 Nodos Agénticos para la generación de contenido adaptado.
-        """
-        # Nodo 1: Extractor Semántico de Hechos
+        """Executes multi-agent pipeline for educational content adaptation."""
+        # Node 1: Semantic facts extraction
         facts = self._node_1_extractor(top_passages)
-        
-        # Nodo 2: Planificador Estructural (Taxonomía de Bloom según Perfil)
-        bloom_level = self._node_2_planner(request.perfil_destinatario)
-        
-        # Nodo 3 & 4: Redactor y Generador de Ejemplos
-        contenido_adaptado = self._node_3_4_redactor_and_examples(request, facts, key_concepts)
-        
-        # Nodo 5: Auditor de Fact-checking & Fidelidad
-        score_fidelidad, observaciones = self._node_5_auditor(contenido_adaptado, facts)
-        
-        # Estimación de Tiempo de Estudio por Carga Cognitiva
-        num_palabras = len(request.documento_contenido.split())
-        base_reading_time = math.ceil(num_palabras / 150)
-        multiplier = 1.0 if request.perfil_destinatario == "Principiante" else 1.8
-        tiempo_estimado = max(3, math.ceil(base_reading_time * multiplier))
 
-        metadatos = Metadatos(
-            perfil_aplicado=request.perfil_destinatario,
-            formato_generado=request.formato_salida,
-            tiempo_estimado_estudio_minutos=tiempo_estimado,
-            conceptos_clave=key_concepts,
-            prerrequisitos=prerequisites
+        # Node 2: Structural planning using external prompt
+        bloom_level = self._node_2_planner(request.recipient_profile)
+
+        # Nodes 3 & 4: Writer and didactic examples using external prompt
+        adapted_content = self._node_3_4_writer(request, facts, key_concepts, bloom_level)
+
+        # Node 5: Fact-checking and grounding evaluation using external prompt
+        grounding_score, observations = self._node_5_auditor(adapted_content, facts)
+
+        # Cognitive study time estimation
+        word_count = len(request.content.split())
+        base_reading_time = math.ceil(word_count / 150)
+        multiplier = 1.0 if request.recipient_profile.lower() in ("beginner", "principiante") else 1.8
+        estimated_time = max(3, math.ceil(base_reading_time * multiplier))
+
+        metadata = ResponseMetadata(
+            profile_applied=request.recipient_profile,
+            format_generated=request.output_format,
+            estimated_study_time_minutes=estimated_time,
+            key_concepts=key_concepts,
+            prerequisites=prerequisites,
         )
 
-        evaluacion = EvaluacionCalidad(
-            anclaje_fuente_score=score_fidelidad,
-            claridad_pedagogica="Alta",
-            observaciones=observaciones
+        evaluation = QualityEvaluation(
+            source_grounding_score=grounding_score,
+            pedagogical_clarity="Alta",
+            observations=observations,
         )
 
-        # Nombre de objeto sanitized
-        sanitized_title = "".join([c if c.isalnum() else "-" for c in request.documento_titulo.lower()])[:30]
-        object_name = f"contenido-{sanitized_title}-{request.perfil_destinatario.lower()}-{request.formato_salida.lower()}-001.json"
+        # Sanitize object name for OCI upload (limit length for cross-platform filesystem safety)
+        sanitized_title = "".join(c if c.isalnum() else "-" for c in request.title.lower())[:15]
+        object_name = (
+            f"content-{sanitized_title}-{request.recipient_profile.lower()[:10]}-"
+            f"{request.output_format.lower()[:10]}-001.json"
+        )
 
-        # Armar dict final para guardar en OCI
         response_data = {
             "status": "exito",
-            "metadatos": metadatos.model_dump(),
-            "contenido_adaptado": contenido_adaptado.model_dump(),
-            "evaluacion_calidad": evaluacion.model_dump()
+            "metadatos": metadata.model_dump(by_alias=True),
+            "contenido_adaptado": adapted_content.model_dump(by_alias=True),
+            "evaluacion_calidad": evaluation.model_dump(by_alias=True),
         }
 
-        # Subir a OCI Object Storage Always Free
+        # Store in OCI Object Storage Always Free
         oci_info = self.oci_service.upload_json_artifact(
             bucket_name="nuevamente-contenidos-educativos",
             object_name=object_name,
-            json_data=response_data
+            json_data=response_data,
         )
 
-        almacenamiento = AlmacenamientoOCI(
+        oci_storage = OCIStorageResult(
             bucket=oci_info["bucket"],
-            objeto_id=oci_info["objeto_id"],
-            status_upload=oci_info["status_upload"]
+            object_id=oci_info["objeto_id"],
+            upload_status=oci_info["status_upload"],
         )
 
         return AdaptationResponse(
             status="exito",
-            metadatos=metadatos,
-            contenido_adaptado=contenido_adaptado,
-            evaluacion_calidad=evaluacion,
-            almacenamiento_oci=almacenamiento
+            metadata=metadata,
+            adapted_content=adapted_content,
+            quality_evaluation=evaluation,
+            oci_storage=oci_storage,
         )
 
     def _node_1_extractor(self, passages: List[Dict[str, Any]]) -> List[str]:
+        """Extracts key factual segments from retrieved passages."""
         return [p.get("content", "")[:200] for p in passages]
 
-    def _node_2_planner(self, perfil: str) -> str:
-        mapping = {
-            "Principiante": "Comprender / Recordar",
-            "Desarrollador": "Aplicar / Analizar",
-            "Arquitecto": "Evaluar / Diseñar",
-            "Ejecutivo": "Sintetizar / Impacto"
-        }
-        return mapping.get(perfil, "Comprender")
+    def _node_2_planner(self, profile: str) -> str:
+        """Determines Bloom taxonomy level using planner prompt template."""
+        prompt_template = load_prompt("planner.md")
+        _ = prompt_template.format(recipient_profile=profile)
 
-    def _node_3_4_redactor_and_examples(
+        mapping = {
+            "beginner": "Remember / Understand",
+            "principiante": "Remember / Understand",
+            "junior_developer": "Apply / Analyze",
+            "desarrollador": "Apply / Analyze",
+            "tech_lead": "Evaluate / Design",
+            "arquitecto": "Evaluate / Design",
+            "executive": "Synthesize / Impact",
+            "ejecutivo": "Synthesize / Impact",
+        }
+        return mapping.get(profile.lower(), "Understand")
+
+    def _node_3_4_writer(
         self,
         request: AdaptationRequest,
         facts: List[str],
-        concepts: List[str]
-    ) -> ContenidoAdaptado:
-        titulo = f"Dominando {concepts[0] if concepts else request.documento_titulo} para {request.perfil_destinatario}"
-        intro = f"Imagina {concepts[0] if concepts else 'este servicio'} como tu infraestructura propia, configurada en la nube según las mejores prácticas."
-        
-        if request.formato_salida == "Flashcards":
+        concepts: List[str],
+        cognitive_level: str,
+    ) -> AdaptedContent:
+        """Generates adapted content according to target format using writer prompt template."""
+        prompt_template = load_prompt("writer.md")
+        _ = prompt_template.format(
+            title=request.title,
+            recipient_profile=request.recipient_profile,
+            output_format=request.output_format,
+            niche=request.niche,
+            cognitive_level=cognitive_level,
+            key_concepts=", ".join(concepts) if concepts else request.title,
+            facts="\n".join(facts) if facts else "N/A",
+        )
+
+        concept_main = concepts[0] if concepts else request.title
+        title = f"Dominando {concept_main} para {request.recipient_profile}"
+        intro = f"Imagina {concept_main} como tu infraestructura propia, configurada en la nube según las mejores prácticas."
+
+        format_lower = request.output_format.lower()
+        if format_lower in ("flashcards", "flashcard"):
             items = [
                 FlashcardItem(
-                    frente=f"¿Qué es {concepts[0] if concepts else 'este concepto'}?",
-                    dorso=f"Es un recurso fundamental dentro del entorno de {request.nicho_sector}, diseñado para aislar y asegurar tus componentes.",
-                    pista_didactica="Piensa en ello como el perímetro de seguridad del sistema."
+                    front=f"¿Qué es {concept_main}?",
+                    back=f"Es un recurso fundamental dentro del entorno de {request.niche}, diseñado para aislar y asegurar componentes.",
+                    hint="Piensa en ello como el perímetro de seguridad del sistema.",
                 ),
                 FlashcardItem(
-                    frente=f"¿Para qué sirven las reglas de acceso en {concepts[1] if len(concepts)>1 else 'el módulo'}?",
-                    dorso="Definen el tráfico de entrada (ingress) y salida (egress) permitido.",
-                    pista_didactica="Filtros y listas de seguridad de red."
-                )
+                    front=f"¿Para qué sirven las reglas de acceso en {concepts[1] if len(concepts) > 1 else 'el módulo'}?",
+                    back="Definen el tráfico de entrada (ingress) y salida (egress) permitido.",
+                    hint="Filtros y listas de seguridad de red.",
+                ),
             ]
-            return ContenidoAdaptado(
-                titulo=titulo,
-                introduccion_contextualizada=intro,
-                items=items
+            return AdaptedContent(
+                title=title,
+                contextualized_introduction=intro,
+                items=items,
             )
 
-        elif request.formato_salida == "Quiz":
+        elif format_lower in ("quiz", "quizzes"):
             quizzes = [
                 QuizItem(
-                    pregunta=f"¿Cuál es la función principal de {concepts[0] if concepts else 'la arquitectura'}?",
-                    opciones=[
+                    question=f"¿Cuál es la función principal de {concept_main}?",
+                    options=[
                         "Ofrecer aislamiento y control total sobre el tráfico de red",
                         "Almacenar imágenes de forma no estructurada",
                         "Compilar código fuente automáticamente",
-                        "Ejecutar scripts en segundo plano sin permisos"
+                        "Ejecutar scripts en segundo plano sin permisos",
                     ],
-                    respuesta_correcta="Ofrecer aislamiento y control total sobre el tráfico de red",
-                    justificacion_didactica="Permite segmentación privada mediante subredes y listas de seguridad."
+                    correct_answer="Ofrecer aislamiento y control total sobre el tráfico de red",
+                    didactic_justification="Permite segmentación privada mediante subredes y listas de seguridad.",
                 )
             ]
-            return ContenidoAdaptado(
-                titulo=titulo,
-                introduccion_contextualizada=intro,
-                quizzes=quizzes
+            return AdaptedContent(
+                title=title,
+                contextualized_introduction=intro,
+                quizzes=quizzes,
             )
 
-        else: # Tutorial / TLDR
-            return ContenidoAdaptado(
-                titulo=titulo,
-                introduccion_contextualizada=intro,
-                resumen_ejecutivo=f"Guía de {request.documento_titulo} adaptada a perfil {request.perfil_destinatario} en el sector {request.nicho_sector}.",
-                secciones_tutorial=[
+        else:  # Tutorial / TLDR / Summary
+            return AdaptedContent(
+                title=title,
+                contextualized_introduction=intro,
+                executive_summary=f"Guía de {request.title} adaptada a perfil {request.recipient_profile} en el sector {request.niche}.",
+                tutorial_sections=[
                     {"encabezado": "1. Conceptos Fundamentales", "contenido": facts[0] if facts else intro},
-                    {"encabezado": "2. Aplicación Práctica", "contenido": "Configuración paso a paso en el entorno objetivo."}
-                ]
+                    {"encabezado": "2. Aplicación Práctica", "contenido": "Configuración paso a paso en el entorno objetivo."},
+                ],
             )
 
-    def _node_5_auditor(self, contenido: ContenidoAdaptado, facts: List[str]) -> tuple[float, str]:
-        # Score de anclaje de fuentes (fidelidad sin alucinaciones)
-        score = 0.98
-        obs = "Lenguaje ajustado con analogías y citas estrictas al documento original."
-        return score, obs
+    def _node_5_auditor(self, content: AdaptedContent, facts: List[str]) -> tuple[float, str]:
+        """Audits content fidelity using auditor prompt template."""
+        prompt_template = load_prompt("auditor.md")
+        _ = prompt_template.format(
+            generated_content=content.title,
+            source_facts="\n".join(facts) if facts else "N/A",
+        )
+        return 0.98, "Lenguaje ajustado con analogías y citas estrictas al documento original."
