@@ -1,0 +1,65 @@
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+
+# ── Virtual environments ───────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Environment variables ─────────────────────────────────────────────────────
+.env
+# Keep the template in git for teammates
+!.env.example
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Testing & coverage ────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ── Ingestion noise ───────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.bak
+*.orig
+
+# ── PDF files (exclude from git; sample_docs are allowed) ────────────────────
+*.pdf
+!tests/manual/sample_docs/*.pdf
+
+# ── Vector store directories ──────────────────────────────────────────────────
+vector_store/
+chroma_db/
+faiss_index/
+
+# ── OCI local fallback storage ────────────────────────────────────────────────
+storage_mock/
+
+# ── OS / IDE ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

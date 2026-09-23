@@ -418,3 +418,9 @@ class IngesterService:
             raw_text=content,
             chunks=chunks,
         )
+
+    def parse_and_chunk_document(self, content: str, title: str) -> Dict[str, Any]:
+        """Backward-compatible adapter that processes raw text and produces
+        the parent/child RAG structure expected by HybridRAGService."""
+        doc = self.process_text(content=content, title=title)
+        return self.build_rag_chunks(doc)
