@@ -5,8 +5,17 @@ Purpose:
     Robust document ingestion and layout-aware chunking service.
     Loads and processes technical documents (PDF, Markdown, Plain Text),
     removes header/footer noise, extracts section structure, and produces
-    both structured document chunks and Parent-Child hierarchical data
-    for the RAG pipeline.
+    both flat document chunks and Parent-Child hierarchical data for the
+    RAG pipeline. Also accepts raw text directly (no file), for requests
+    that send document content inline instead of uploading a file.
+
+Input:
+    A file path (process_document) or raw text (process_text), plus
+    optional IngestionOptions.
+
+Output:
+    An IngestedDocument. Call build_rag_chunks() on that result to get
+    the parent/child structure the RAG retrieval layer expects.
 """
 
 import re
@@ -37,6 +46,9 @@ class IngesterService:
         parent_chunk_size: int = settings.CHUNK_SIZE,
         overlap: int = settings.CHUNK_OVERLAP,
     ):
+        # Both sizes are measured in characters, same unit as chunk_text(),
+        # so parent and child chunks are produced with identical splitting
+        # quality — only the target size differs.
         self.child_chunk_size = child_chunk_size
         self.parent_chunk_size = parent_chunk_size
         self.overlap = overlap
@@ -221,6 +233,9 @@ class IngesterService:
 
     @staticmethod
     def split_by_characters(text: str, chunk_size: int, overlap: int) -> List[str]:
+        """Sliding window fallback for a single paragraph longer than
+        chunk_size. Both ends of every piece are aligned to the nearest
+        whitespace so a piece never begins or ends mid-word."""
         chunks = []
         start = 0
         text_length = len(text)
@@ -250,7 +265,13 @@ class IngesterService:
 
         return chunks
 
-    def chunk_text(self, text: str) -> List[str]:
+    def chunk_text(self, text: str, chunk_size: Optional[int] = None) -> List[str]:
+        """Groups paragraphs into pieces up to chunk_size, keeping paragraph
+        boundaries intact. Defaults to parent_chunk_size, but accepts a
+        different size so the same, already-validated splitting logic can
+        also produce child chunks — instead of a separate, cruder pass."""
+        size = chunk_size or self.parent_chunk_size
+
         if not text.strip():
             return []
 
@@ -259,15 +280,15 @@ class IngesterService:
         current_chunk = ""
 
         for paragraph in paragraphs:
-            if len(paragraph) > self.parent_chunk_size:
+            if len(paragraph) > size:
                 if current_chunk:
                     chunks.append(current_chunk.strip())
                     current_chunk = ""
-                chunks.extend(self.split_by_characters(paragraph, self.parent_chunk_size, self.overlap))
+                chunks.extend(self.split_by_characters(paragraph, size, self.overlap))
                 continue
 
             candidate = f"{current_chunk}\n\n{paragraph}".strip() if current_chunk else paragraph
-            if len(candidate) <= self.parent_chunk_size:
+            if len(candidate) <= size:
                 current_chunk = candidate
             else:
                 chunks.append(current_chunk.strip())
@@ -279,6 +300,7 @@ class IngesterService:
         return chunks
 
     def build_chunks_from_sections(self, sections: List[Section], document_id: str) -> List[DocumentChunk]:
+        """Builds the flat (parent-level) chunk list from detected sections."""
         chunks: List[DocumentChunk] = []
         index = 0
 
@@ -299,7 +321,63 @@ class IngesterService:
         return chunks
 
     # ---------------------------------------------------------------------------
-    # Main methods
+    # Parent/child RAG structure
+    # ---------------------------------------------------------------------------
+    def build_rag_chunks(self, document: IngestedDocument) -> Dict[str, Any]:
+        """Takes an already-ingested document and produces the parent/child
+        structure the retrieval layer expects. Each parent chunk (already
+        section-aware, from build_chunks_from_sections) is re-split into
+        smaller children only when it exceeds child_chunk_size, using the
+        same paragraph-aware chunk_text() — not a separate raw word-count
+        split, so parent and child chunks share the same splitting quality."""
+        parent_chunks: List[Dict[str, Any]] = []
+        child_chunks: List[Dict[str, Any]] = []
+
+        for idx, chunk in enumerate(document.chunks):
+            parent_id = f"parent_{idx}"
+            section_title = chunk.section_title or f"Sección {idx + 1}"
+
+            parent_chunks.append({
+                "id": parent_id,
+                "title": section_title,
+                "breadcrumb": f"{document.title} > {section_title}",
+                "content": chunk.text,
+                "metadata": {
+                    "source_title": document.title,
+                    "section_index": idx,
+                    "page_number": chunk.page_number,
+                    "heading_level": chunk.heading_level,
+                },
+            })
+
+            child_pieces = (
+                [chunk.text]
+                if len(chunk.text) <= self.child_chunk_size
+                else self.chunk_text(chunk.text, chunk_size=self.child_chunk_size)
+            )
+
+            for child_idx, child_text in enumerate(child_pieces):
+                child_chunks.append({
+                    "id": f"{parent_id}_child_{child_idx}",
+                    "parent_id": parent_id,
+                    "breadcrumb": f"[{document.title} > {section_title}]",
+                    "content": child_text,
+                    "metadata": {
+                        "parent_id": parent_id,
+                        "source": document.title,
+                    },
+                })
+
+        return {
+            "title": document.title,
+            "parent_chunks": parent_chunks,
+            "child_chunks": child_chunks,
+            "total_parents": len(parent_chunks),
+            "total_children": len(child_chunks),
+        }
+
+    # ---------------------------------------------------------------------------
+    # Main entry points
     # ---------------------------------------------------------------------------
     def process_document(
         self,
@@ -324,20 +402,19 @@ class IngesterService:
             chunks=chunks,
         )
 
-    def parse_and_chunk_document(self, content: str, title: str) -> Dict[str, Any]:
-        """
-        Legacy-compatible method: parses string content into hierarchical RAG chunks
-        (parent_chunks and child_chunks) for backward compatibility with adaptation pipeline.
-        """
+    def process_text(self, content: str, title: str) -> IngestedDocument:
+        """Processes raw text sent inline (e.g. a JSON request body with
+        content, no file upload) the same way process_document()
+        handles a file. No file extension is available, so section
+        detection uses the TXT heuristic."""
         document_id = str(uuid.uuid4())
-        sections = self.detect_sections(content, ".md")
+        sections = self.detect_sections(content, ".txt")
         chunks = self.build_chunks_from_sections(sections, document_id)
 
-        doc = IngestedDocument(
+        return IngestedDocument(
             document_id=document_id,
             title=title,
-            source_filename="input.md",
+            source_filename="inline_text",
             raw_text=content,
             chunks=chunks,
         )
-        return doc.to_rag_format()
