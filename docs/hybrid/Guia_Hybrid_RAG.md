@@ -41,3 +41,23 @@ source .venv/bin/activate
 uv run uvicorn main:app --reload
 ```
 *Nota:* Asegúrate de tener configuradas tus variables de entorno en el archivo `.env` (GEMINI_API_KEY, JINA_API_KEY, COHERE_API_KEY).
+
+## Resultados Esperados y Ecosistema de Modelos de IA
+Al igual que en el módulo de Ingestión (donde usamos **KeyBERT** para extraer conceptos clave gratuitamente sin gastar tokens del LLM), todo este ecosistema de RAG Híbrido y Grafos está diseñado con una premisa: **"Usar la herramienta adecuada para el trabajo adecuado"**. 
+
+Este es el resultado arquitectónico final que logramos y el rol de cada modelo:
+
+1. **Google Gemini (Generador y Cerebro Principal):**
+   - *Rol:* Orquestador. Entiende la solicitud, analiza el "Knowledge Graph" y redacta el material educativo final. 
+   - *¿Por qué?* Es un LLM generativo súper poderoso. Su fuerte es razonar y escribir.
+2. **Jina AI (El Especialista en Vectores - Plan B):**
+   - *Rol:* Motor de Embeddings y Fallback semántico.
+   - *¿Por qué?* Jina está altamente optimizado para calcular matemáticas de texto (vectores). No genera texto, pero es el mejor entendiendo "qué se parece a qué". Lo usamos como segunda capa si Gemini falla.
+3. **Cohere (El Optimizador Final - Reranker):**
+   - *Rol:* Ordenar los resultados antes de entregarlos.
+   - *¿Por qué?* Su modelo `rerank-multilingual-v3.0` (Cross-Encoder) lee las preguntas y las respuestas al mismo tiempo para calificar su relevancia exacta. Mejora drásticamente la puntería de lo que va a leer Gemini.
+4. **Modelos Locales (Sentence-Transformers / KeyBERT):**
+   - *Rol:* El escudo final y optimización de ingesta.
+   - *¿Por qué?* Si no hay internet o se acaban las APIs gratuitas, tu computadora levanta estos pequeños modelos localmente. Así tu aplicación web *nunca* se cae. Y en la ingesta, extraen metadatos gratis y rápido.
+
+Con este ecosistema logramos una **arquitectura Enterprise**, donde ningún modelo hace el trabajo del otro, optimizando velocidad y reduciendo costos a $0 en el nivel Always Free.

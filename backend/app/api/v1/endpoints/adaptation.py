@@ -19,11 +19,13 @@ from app.services.ingester_service import IngesterService
 from app.services.hybrid_rag_service import HybridRAGService
 from app.services.graph_rag_service import GraphRAGService
 from app.services.agent_orchestrator import AgentOrchestrator
+from app.services.embedding_service import EmbeddingService
 
 router = APIRouter()
 
 ingester_service = IngesterService()
-hybrid_rag_service = HybridRAGService()
+embedding_service = EmbeddingService()
+hybrid_rag_service = HybridRAGService(embedding_service=embedding_service)
 graph_rag_service = GraphRAGService()
 agent_orchestrator = AgentOrchestrator()
 
