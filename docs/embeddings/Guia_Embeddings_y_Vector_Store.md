@@ -82,6 +82,44 @@ jina_svc = EmbeddingService(method="api", provider="jina")
 local_svc = EmbeddingService(method="local")
 ```
 
+### Uso del Vector Store (FAISS)
+
+```python
+from app.services.vector_store_service import FAISSVectorStore
+
+# 1. Crear el índice FAISS para el modelo activo
+vector_store = FAISSVectorStore(model_name=embedding_svc.model_name)
+
+# 2. Indexar child chunks con sus vectores y registrar padres
+vector_store.add_documents(
+    child_chunks=rag_payload["child_chunks"],
+    embeddings=vectores_batch,
+    parent_chunks=rag_payload["parent_chunks"],
+    model_name=embedding_svc.model_name,
+)
+
+# 3. Búsqueda semántica de fragmentos hijos
+hijos_top = vector_store.similarity_search(
+    query_embedding=vector_query,
+    query_model_name=embedding_svc.model_name,
+    top_k=3,
+)
+
+# 4. Recuperación directa de Parent Chunks completos para el LLM
+padres_top = vector_store.retrieve_parent_chunks(
+    query_embedding=vector_query,
+    query_model_name=embedding_svc.model_name,
+    top_k_parents=2,
+)
+
+# 5. Persistencia en disco
+vector_store.save("vector_store/mi_indice")
+
+# 6. Carga desde disco
+store_cargado = FAISSVectorStore()
+store_cargado.load("vector_store/mi_indice")
+```
+
 ---
 
 ## 3. Configuración del Entorno (`.env`)
@@ -100,7 +138,7 @@ EMBEDDING_METHOD=api
 EMBEDDING_API_PROVIDER=gemini
 
 # Vector Store local
-VECTOR_STORE_METHOD=chroma
+VECTOR_STORE_METHOD=faiss
 VECTOR_STORE_DIR=vector_store
 ```
 
@@ -108,14 +146,26 @@ VECTOR_STORE_DIR=vector_store
 
 ## 4. Pruebas Manuales con `uv`
 
-Para validar la conexión con las APIs de embeddings y verificar el control de compatibilidad entre modelos:
+Para validar los módulos de forma aislada:
 
+### Test de Embeddings
 ```powershell
 cd backend
 uv run python tests/manual/test_embedding.py
 ```
-
-El script ejecutará tres comprobaciones:
 1. Generación de vector individual, de consulta y batch vía Google Gemini.
 2. Generación de vector vía Jina AI (si `JINA_API_KEY` está configurada).
 3. Verificación de rechazo de compatibilidad cruzada entre modelos de diferente dimensión.
+
+### Test Completo de Cadena con FAISS Vector Store
+```powershell
+cd backend
+uv run python tests/manual/test_vector_store.py
+```
+Ejecuta la cadena de extremo a extremo:
+1. Ingesta y chunking jerárquico Padre-Hijo.
+2. Generación de embeddings reales.
+3. Indexación en FAISS y cálculo de similitud coseno.
+4. Búsqueda semántica y resolución automática de Parent Chunks.
+5. Persistencia y recarga desde disco (`index.faiss` + `metadata.json`).
+6. Bloqueo estricto por intento de búsqueda con modelo incompatible.
