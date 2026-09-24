@@ -128,8 +128,8 @@ class EmbeddingService:
             # result.embeddings is a list; we embed one text at a time here.
             return result.embeddings[0].values
         except Exception as exc:
-            logger.warning("Gemini embedding failed (%s). Falling back to local.", exc)
-            return self._fallback_embed(text)
+            logger.warning("Gemini embedding failed (%s). Falling back to cascade.", exc)
+            return self._fallback_embed(text, failed_provider="gemini")
 
     # ── Private: Jina ──────────────────────────────────────────────────────────
 
@@ -152,8 +152,8 @@ class EmbeddingService:
             # Jina returns results sorted by index.
             return [item["embedding"] for item in sorted(data["data"], key=lambda x: x["index"])]
         except Exception as exc:
-            logger.warning("Jina embedding failed (%s). Falling back to local.", exc)
-            return [self._fallback_embed(t) for t in texts]
+            logger.warning("Jina embedding failed (%s). Falling back to cascade.", exc)
+            return [self._fallback_embed(t, failed_provider="jina") for t in texts]
 
     # ── Private: Local ─────────────────────────────────────────────────────────
 
@@ -178,14 +178,43 @@ class EmbeddingService:
         embeddings = self._model.encode(texts, convert_to_numpy=True)
         return embeddings.tolist()
 
-    # ── Private: Fallback ──────────────────────────────────────────────────────
+    # ── Private: Fallback Cascade ──────────────────────────────────────────────
 
-    def _fallback_embed(self, text: str) -> List[float]:
+    def _fallback_embed(self, text: str, failed_provider: str) -> List[float]:
         """
-        Last-resort fallback when both API and local model fail.
-        Raises RuntimeError — a silent zero vector would corrupt the index.
+        Cascada inteligente de fallbacks. 
+        Si Gemini falla -> Jina (50% del texto) -> Local (25% del texto).
         """
+        logger.warning(f"Activando fallback tras fallo de {failed_provider}")
+        
+        if failed_provider == "gemini":
+            logger.info("Fallback a Jina AI (texto truncado al 50%)")
+            try:
+                # Truncamos texto a la mitad para Jina
+                short_text = text[:max(1, len(text) // 2)]
+                self.provider = "jina"
+                self.model_name = settings.EMBEDDING_API_MODELS.get("jina", "jina-embeddings-v2-base-es")
+                return self._embed_jina_batch([short_text])[0]
+            except Exception as e:
+                logger.error(f"Fallback Jina también falló: {e}")
+                return self._fallback_embed(text, failed_provider="jina")
+                
+        elif failed_provider == "jina":
+            logger.info("Fallback a Modelo Local (texto truncado al 25%)")
+            try:
+                # Truncamos texto a un cuarto para local
+                short_text = text[:max(1, len(text) // 4)]
+                self.method = "local"
+                self.model_name = settings.LOCAL_EMBEDDING_MODEL
+                if not self._model:
+                    self._model = self._load_local_model()
+                return self._embed_local([short_text])[0]
+            except Exception as e:
+                logger.error(f"Fallback Local también falló: {e}")
+                return self._fallback_embed(text, failed_provider="local")
+                
+        # Si todo falló
         raise RuntimeError(
-            f"All embedding providers failed for text (len={len(text)}). "
-            "Check API keys and local model availability."
+            f"Todos los proveedores de embeddings fallaron para el texto (len={len(text)}). "
+            "Revisa las API keys y la disponibilidad del modelo local."
         )

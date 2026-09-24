@@ -325,17 +325,29 @@ class IngesterService:
     # ---------------------------------------------------------------------------
     def build_rag_chunks(self, document: IngestedDocument) -> Dict[str, Any]:
         """Takes an already-ingested document and produces the parent/child
-        structure the retrieval layer expects. Each parent chunk (already
-        section-aware, from build_chunks_from_sections) is re-split into
-        smaller children only when it exceeds child_chunk_size, using the
-        same paragraph-aware chunk_text() — not a separate raw word-count
-        split, so parent and child chunks share the same splitting quality."""
+        structure the retrieval layer expects."""
+        
+        # Inicializar KeyBERT para extraer conceptos gratis y rápido
+        try:
+            from keybert import KeyBERT
+            import logging
+            logging.getLogger().info("Cargando modelo KeyBERT ligero...")
+            kw_model = KeyBERT(model="all-MiniLM-L6-v2")
+        except ImportError:
+            kw_model = None
         parent_chunks: List[Dict[str, Any]] = []
         child_chunks: List[Dict[str, Any]] = []
 
         for idx, chunk in enumerate(document.chunks):
             parent_id = f"parent_{idx}"
             section_title = chunk.section_title or f"Sección {idx + 1}"
+
+            # Extracción de Conceptos Clave en Tiempo de Ingesta (Costo 0 de API)
+            key_concepts = []
+            if kw_model and len(chunk.text) > 50:
+                # Extraemos 4 frases/palabras clave en inglés o español
+                keywords = kw_model.extract_keywords(chunk.text, keyphrase_ngram_range=(1, 2), stop_words=None, top_n=4)
+                key_concepts = [kw[0] for kw in keywords]
 
             parent_chunks.append({
                 "id": parent_id,
@@ -347,6 +359,7 @@ class IngesterService:
                     "section_index": idx,
                     "page_number": chunk.page_number,
                     "heading_level": chunk.heading_level,
+                    "key_concepts": key_concepts,
                 },
             })
 
