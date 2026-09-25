@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NuevaMente — Sistema Inteligente de Adaptación Educativa</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --bg-slate: #f8fafc;
+      --text-dark: #0f172a;
+      --border-color: #e2e8f0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-slate); color: var(--text-dark); line-height: 1.5; }
+    
+    .navbar { background: #0f172a; color: white; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: flex; align-items: center; gap: 0.75rem; font-size: 1.25rem; font-weight: bold; }
+    .logo { font-size: 1.75rem; }
+    .badge { background: #38bdf8; color: #0f172a; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700; }
+    
+    .container { max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+    
+    .card { background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .card h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 1rem; color: #1e293b; display: flex; align-items: center; gap: 0.5rem; }
+    
+    .form-group { margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: 0.4rem; }
+    label { font-size: 0.85rem; font-weight: 600; color: #475569; }
+    input[type="text"], select, textarea { padding: 0.75rem; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 0.95rem; font-family: inherit; width: 100%; }
+    textarea { resize: vertical; min-height: 120px; }
+    
+    /* File Upload Drag & Drop Area */
+    .file-dropzone {
+      border: 2px dashed #94a3b8;
+      border-radius: 10px;
+      padding: 1.5rem;
+      text-align: center;
+      background: #f8fafc;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 1rem;
+    }
+    .file-dropzone:hover, .file-dropzone.dragover {
+      border-color: var(--primary);
+      background: #eff6ff;
+    }
+    .drop-icon { font-size: 2.2rem; margin-bottom: 0.5rem; display: block; }
+    .drop-title { font-weight: 700; font-size: 1rem; color: #1e293b; margin-bottom: 0.25rem; }
+    .drop-sub { font-size: 0.82rem; color: #64748b; }
+    .file-input-hidden { display: none; }
+    
+    .file-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #dbeafe;
+      color: #1e40af;
+      padding: 0.4rem 0.85rem;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 0.5rem;
+    }
+    .file-badge .remove-btn { cursor: pointer; color: #ef4444; font-weight: bold; margin-left: 0.4rem; }
+    
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+    
+    .btn-submit { width: 100%; padding: 1rem; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; border: none; border-radius: 8px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: all 0.2s ease; margin-top: 0.5rem; }
+    .btn-submit:hover { opacity: 0.95; transform: translateY(-1px); }
+    
+    .loading-state { text-align: center; padding: 2.5rem; background: white; border-radius: 12px; border: 1px solid var(--border-color); display: none; }
+    .spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; width: 44px; height: 44px; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    
+    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .metric-card { background: white; padding: 1rem 1.25rem; border-radius: 10px; border: 1px solid var(--border-color); display: flex; align-items: center; gap: 1rem; }
+    .metric-icon { font-size: 2rem; }
+    .metric-label { font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; }
+    .metric-val { font-size: 1.25rem; font-weight: 800; color: #0f172a; }
+    .metric-val.success { color: #16a34a; }
+    
+    .badge-tag { background: #e0f2fe; color: #0369a1; padding: 0.3rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600; display: inline-block; margin-right: 0.4rem; margin-bottom: 0.4rem; }
+    
+    .viewer-box { background: white; padding: 1.75rem; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 1.5rem; }
+    .intro-banner { background: #f0f9ff; border-left: 4px solid #0284c7; padding: 1rem; border-radius: 6px; margin: 1rem 0; font-style: italic; color: #0369a1; }
+    
+    .flashcard { background: #ffffff; border: 1px solid var(--border-color); border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.03); }
+    .flashcard:hover { border-color: var(--primary); }
+    .flashcard .front { font-weight: 700; font-size: 1.05rem; color: #1e293b; margin-bottom: 0.5rem; }
+    .flashcard .back { display: none; color: #1e40af; background: #eff6ff; padding: 0.85rem; border-radius: 6px; margin-top: 0.5rem; }
+    .flashcard.flipped .back { display: block; }
+    .flashcard .hint { font-size: 0.85rem; color: #d97706; font-style: italic; display: block; margin-top: 0.4rem; }
+    
+    #resultsSection { display: none; }
+  </style>
+</head>
+<body>
+
+  <header class="navbar">
+    <div class="brand">
+      <span class="logo">🎓</span>
+      <span>NuevaMente</span>
+    </div>
+    <span class="badge">Oracle ONE G10</span>
+  </header>
+
+  <main class="container">
+    <div class="card">
+      <h3>📥 Documento Técnico de Entrada</h3>
+      
+      <!-- Zona de Carga de Archivo (PDF / Markdown / Texto) -->
+      <div 
+        class="file-dropzone" 
+        id="dropzone"
+        onclick="document.getElementById('fileInput').click()"
+      >
+        <span class="drop-icon">📄</span>
+        <div class="drop-title">Haz clic o arrastra aquí un archivo (PDF, Markdown o TXT)</div>
+        <div class="drop-sub">Formatos soportados: <strong>.pdf</strong>, <strong>.md</strong>, <strong>.markdown</strong>, <strong>.txt</strong></div>
+        <input 
+          type="file" 
+          id="fileInput" 
+          class="file-input-hidden" 
+          accept=".pdf,.md,.markdown,.txt" 
+          onchange="handleFileSelect(event)"
+        />
+        <div id="fileInfoBadge" style="display:none;"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="docTitulo">Título del Documento:</label>
+        <input type="text" id="docTitulo" value="Introduccion a la Arquitectura de Redes VCN en OCI">
+      </div>
+
+      <div class="form-group">
+        <label for="docContenido">Contenido Técnico Extraído (Editable):</label>
+        <textarea id="docContenido">La Virtual Cloud Network (VCN) es una red privada y personalizable configurada en Oracle Cloud Infrastructure. Similar a una red de centro de datos tradicional, la VCN ofrece control total sobre su entorno de red, incluyendo subredes publicas y privadas, tablas de enrutamiento, Internet Gateways, NAT Gateways y Security Lists para control de trafico mediante reglas de entrada (ingress) y salida (egress).</textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>⚙️ Parámetros de Adaptación Didáctica</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="perfilSelect">Perfil del Destinatario:</label>
+          <select id="perfilSelect">
+            <option value="Principiante" selected>Principiante / Transición de Carrera</option>
+            <option value="Desarrollador">Desarrollador Junior / Mid</option>
+            <option value="Arquitecto">Líder Técnico / Arquitecto</option>
+            <option value="Ejecutivo">Gestor / Ejecutivo (No Técnico)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="formatoSelect">Formato Pedagógico:</label>
+          <select id="formatoSelect">
+            <option value="Flashcards" selected>Flashcards de Memorización</option>
+            <option value="Quiz">Quiz Interactivo con Justificaciones</option>
+            <option value="Tutorial">Guía Práctica Paso a Paso</option>
+            <option value="TLDR">Resumen Ejecutivo (TL;DR)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="nichoSelect">Nicho / Industria:</label>
+          <select id="nichoSelect">
+            <option value="General" selected>General / Infraestructura Nube</option>
+            <option value="Fintech">Fintech & Servicios Financieros</option>
+            <option value="Salud">Salud & Biotecnología</option>
+            <option value="E-commerce">E-commerce & Retail</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn-submit" onclick="generarAdaptacion()">
+        ⚡ Procesar Adaptación con Graph RAG, RAG Híbrido & Gemini
+      </button>
+    </div>
+
+    <div class="loading-state" id="loadingState">
+      <div class="spinner"></div>
+      <p><strong id="loadingStatusText">Ejecutando Pipeline Agéntico...</strong></p>
+      <p style="font-size:0.85rem; color:#64748b; margin-top:0.4rem;">Parsing AST $\rightarrow$ Graph RAG $\rightarrow$ Búsqueda Híbrida BM25+Embedding $\rightarrow$ Gemini 1.5 Pro</p>
+    </div>
+
+    <div id="resultsSection">
+      <div class="dashboard-grid">
+        <div class="metric-card">
+          <span class="metric-icon">⏱️</span>
+          <div>
+            <div class="metric-label">Tiempo de Estudio</div>
+            <div class="metric-val" id="valTiempo">3 min</div>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <span class="metric-icon">🎯</span>
+          <div>
+            <div class="metric-label">Anclaje en Fuentes</div>
+            <div class="metric-val success" id="valAnclaje">98%</div>
+          </div>
+        </div>
+
+        <div class="metric-card">
+          <span class="metric-icon">☁️</span>
+          <div>
+            <div class="metric-label">Persistencia OCI</div>
+            <div class="metric-val" style="font-size:0.95rem; color:#d97706;" id="valOCI">Completado</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🔑 Conceptos Clave Extrapolados (DAG Graph RAG)</h3>
+        <div id="conceptosContainer"></div>
+      </div>
+
+      <div class="viewer-box">
+        <h2 id="resTitulo" style="color:#0f172a; font-size:1.4rem;"></h2>
+        <div class="intro-banner" id="resIntro"></div>
+        <div id="itemsContainer"></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Configurar Drag & Drop en la Dropzone
+    const dropzone = document.getElementById('dropzone');
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add('dragover');
+      }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropzone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('dragover');
+      }, false);
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files.length > 0) {
+        processFile(files[0]);
+      }
+    });
+
+    function handleFileSelect(event) {
+      const files = event.target.files;
+      if (files.length > 0) {
+        processFile(files[0]);
+      }
+    }
+
+    async function processFile(file) {
+      const badge = document.getElementById('fileInfoBadge');
+      badge.style.display = 'inline-flex';
+      badge.className = 'file-badge';
+      badge.innerHTML = `📄 ${file.name} (${Math.round(file.size/1024)} KB) <span class="remove-btn" onclick="clearFile(event)">✕</span>`;
+
+      // Auto-completar título desde el nombre del archivo
+      const cleanTitle = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+      document.getElementById('docTitulo').value = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
+
+      const ext = file.name.split('.').pop().toLowerCase();
+
+      if (ext === 'txt' || ext === 'md' || ext === 'markdown') {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          document.getElementById('docContenido').value = e.target.result;
+        };
+        reader.readAsText(file);
+      } else if (ext === 'pdf') {
+        // Enviar archivo al backend FastAPI para extracción PDF
+        const loading = document.getElementById('loadingState');
+        const loadingText = document.getElementById('loadingStatusText');
+        loadingText.innerText = "Extrayendo texto del archivo PDF...";
+        loading.style.display = 'block';
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+          const res = await fetch('http://localhost:8000/api/v1/parse-pdf', {
+            method: 'POST',
+            body: formData
+          });
+          const data = await res.json();
+          loading.style.display = 'none';
+          if (data.texto_extraido) {
+            document.getElementById('docContenido').value = data.texto_extraido;
+          }
+        } catch (err) {
+          loading.style.display = 'none';
+          alert('Error al extraer texto del PDF. Verifica que el servidor esté activo.');
+        }
+      }
+    }
+
+    function clearFile(event) {
+      event.stopPropagation();
+      document.getElementById('fileInput').value = '';
+      document.getElementById('fileInfoBadge').style.display = 'none';
+    }
+
+    async function generarAdaptacion() {
+      const loading = document.getElementById('loadingState');
+      const results = document.getElementById('resultsSection');
+      const loadingText = document.getElementById('loadingStatusText');
+      loadingText.innerText = "Ejecutando Pipeline Agéntico Gemini...";
+      
+      loading.style.display = 'block';
+      results.style.display = 'none';
+
+      const payload = {
+        documento_titulo: document.getElementById('docTitulo').value,
+        documento_contenido: document.getElementById('docContenido').value,
+        perfil_destinatario: document.getElementById('perfilSelect').value,
+        formato_salida: document.getElementById('formatoSelect').value,
+        nicho_sector: document.getElementById('nichoSelect').value,
+        nivel_detalle: 'Didactico'
+      };
+
+      try {
+        const response = await fetch('http://localhost:8000/api/v1/adapt-content', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        loading.style.display = 'none';
+        results.style.display = 'block';
+
+        // Render Metadatos
+        document.getElementById('valTiempo').innerText = `${data.metadatos.tiempo_estimado_estudio_minutos} min`;
+        document.getElementById('valAnclaje').innerText = `${Math.round(data.evaluacion_calidad.anclaje_fuente_score * 100)}%`;
+        document.getElementById('valOCI').innerText = data.almacenamiento_oci.status_upload.toUpperCase();
+
+        // Render Conceptos
+        const conceptBox = document.getElementById('conceptosContainer');
+        conceptBox.innerHTML = '';
+        data.metadatos.conceptos_clave.forEach(c => {
+          conceptBox.innerHTML += `<span class="badge-tag">${c}</span>`;
+        });
+
+        // Render Contenido Adaptado
+        document.getElementById('resTitulo').innerText = data.contenido_adaptado.titulo;
+        document.getElementById('resIntro').innerText = data.contenido_adaptado.introduccion_contextualizada;
+
+        const itemsBox = document.getElementById('itemsContainer');
+        itemsBox.innerHTML = '';
+
+        if (data.contenido_adaptado.items) {
+          data.contenido_adaptado.items.forEach((item, idx) => {
+            itemsBox.innerHTML += `
+              <div class="flashcard" onclick="this.classList.toggle('flipped')">
+                <div class="front">❓ #${idx+1}: ${item.frente}</div>
+                ${item.pista_didactica ? `<span class="hint">💡 Pista: ${item.pista_didactica}</span>` : ''}
+                <div class="back">✨ ${item.dorso}</div>
+              </div>
+            `;
+          });
+        }
+      } catch (err) {
+        loading.style.display = 'none';
+        alert('Error al conectar con la API de FastAPI. Asegúrate de que el servidor en http://localhost:8000 esté corriendo.');
+      }
+    }
+  </script>
+</body>
+</html>
