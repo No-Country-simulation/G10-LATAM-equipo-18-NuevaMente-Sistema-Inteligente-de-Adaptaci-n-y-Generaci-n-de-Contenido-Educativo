@@ -46,19 +46,16 @@ class GeminiClient:
         system_instruction: Optional[str] = None,
         model_name: str = "gemini-2.5-flash",
         json_output: bool = True,
+        image_path: Optional[str] = None,
     ) -> str:
         """
-        Generates content using Gemini. Falls back to mock on any error.
-
-        Args:
-            prompt: User-facing prompt text.
-            system_instruction: Optional system role instruction.
-            model_name: Gemini model identifier.
-            json_output: When True, requests application/json MIME type.
+        Generates content using Gemini. Supports multimodal input if image_path is provided.
+        Falls back to mock on any error.
         """
         if self.has_real_key and self._client is not None:
             try:
                 from google.genai import types  # noqa: PLC0415
+                from PIL import Image # noqa: PLC0415
 
                 config_kwargs = {}
                 if json_output:
@@ -66,9 +63,15 @@ class GeminiClient:
                 if system_instruction:
                     config_kwargs["system_instruction"] = system_instruction
 
+                # Prepara el contenido (Solo texto, o Texto + Imagen)
+                contents = [prompt]
+                if image_path and os.path.exists(image_path):
+                    img = Image.open(image_path)
+                    contents.append(img)
+
                 response = self._client.models.generate_content(
                     model=model_name,
-                    contents=prompt,
+                    contents=contents,
                     config=types.GenerateContentConfig(**config_kwargs) if config_kwargs else None,
                 )
                 return response.text
@@ -80,8 +83,24 @@ class GeminiClient:
     def _mock_response(self, prompt: str) -> str:
         """Returns a structured JSON string for development / no-key environments."""
         return json.dumps({
-            "titulo_adaptado": "Adaptación Inteligente de Contenido",
-            "resumen": "Procesamiento completado a través del pipeline RAG con Google Gemini.",
-            "facts": ["Concepto A extraído", "Concepto B verificado"],
-            "anclaje_score": 0.98,
+            "metadatos": {
+                "perfil_aplicado": "Estudiante (Mock)",
+                "formato_generado": "Resumen",
+                "tiempo_estimado_estudio_minutos": 10,
+                "conceptos_clave": ["Mock A", "Mock B"],
+                "prerrequisitos": []
+            },
+            "contenido_adaptado": {
+                "titulo": "Adaptación Inteligente (Mock)",
+                "introduccion_contextualizada": "El servidor de Gemini está saturado o sin llaves, modo mock.",
+                "resumen_ejecutivo": "Procesamiento completado a través del pipeline RAG con mock.",
+                "items": [],
+                "quizzes": [],
+                "secciones_tutorial": []
+            },
+            "evaluacion_calidad": {
+                "anclaje_fuente_score": 1.0,
+                "claridad_pedagogica": "Alta",
+                "observaciones": "Respuesta simulada porque Gemini API falló (503) o no hay llave."
+            }
         })
