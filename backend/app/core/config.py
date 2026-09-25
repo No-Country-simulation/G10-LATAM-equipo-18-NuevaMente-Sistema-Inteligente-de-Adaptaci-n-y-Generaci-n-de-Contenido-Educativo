@@ -1,5 +1,10 @@
 import os
 from pydantic import BaseModel
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 class Settings(BaseModel):
     PROJECT_NAME: str = "NuevaMente - API de Adaptación Educativa"

@@ -8,6 +8,8 @@ class AdaptationRequest(BaseModel):
     formato_salida: str = Field(..., example="Flashcards")         # Flashcards, Tutorial, Quiz, TLDR
     nicho_sector: str = Field(default="General", example="General") # Fintech, Salud, E-commerce, General
     nivel_detalle: str = Field(default="Didactico", example="Didactico")
+    cantidad_generar: Optional[int] = Field(default=5)
+    instrucciones_adicionales: Optional[str] = Field(default=None)
 
 class FlashcardItem(BaseModel):
     frente: str

@@ -24,12 +24,16 @@ class AgentOrchestrator:
         """
         Orquesta los 5 Nodos Agénticos para la generación de contenido adaptado.
         """
-        # Limpieza de título si es solo un código de paper como 2005.11401
+        # Limpieza y formateo de título
         doc_title = request.documento_titulo
-        if re.match(r'^\d+(\.\d+)?$', doc_title.strip()):
+        doc_title = re.sub(r'\.(pdf|md|markdown|txt)$', '', doc_title.strip(), flags=re.IGNORECASE)
+        doc_title = re.sub(r'[-_]', ' ', doc_title).strip()
+        if not doc_title or re.match(r'^\d+(\.\d+)?$', doc_title):
             lines = [l.strip() for l in request.documento_contenido.split('\n') if len(l.strip()) > 10 and not l.startswith('---')]
             if lines:
                 doc_title = lines[0][:60]
+            else:
+                doc_title = "Documento Técnico"
 
         # Nodo 1: Extractor Semántico de Hechos
         facts = self._node_1_extractor(top_passages, request.documento_contenido)
@@ -131,95 +135,98 @@ class AgentOrchestrator:
         main_concept = concepts[0] if concepts else doc_title
         sec_concept = concepts[1] if len(concepts) > 1 else "Arquitectura"
 
+        count = request.cantidad_generar or 5
+        additional_info = f" (Nota: {request.instrucciones_adicionales})" if request.instrucciones_adicionales else ""
+
         titulo = f"Guía Adaptada de {doc_title} para {request.perfil_destinatario}"
         intro = f"Esta versión adaptada transforma la documentación técnica de '{doc_title}' en un marco práctico orientado al perfil de {request.perfil_destinatario} en la industria de {request.nicho_sector}."
 
         # 1. FORMATO: TUTORIAL / GUÍA PASO A PASO
-        if request.formato_salida in ["Tutorial", "Guía Práctica Paso a Paso", "Tutorial / Guía Práctica"]:
-            sec1_text = facts[0] if len(facts) > 0 else f"Comprensión de los pilares de {main_concept}."
-            sec2_text = facts[1] if len(facts) > 1 else f"Integración y aplicación del concepto de {sec_concept}."
-            sec3_text = facts[2] if len(facts) > 2 else "Optimización, métricas de rendimiento y verificación de resultados."
-
-            secciones = [
-                {
-                    "encabezado": f"Paso 1: Fundamentos Didácticos de {main_concept}",
-                    "contenido": f"El primer paso para dominar este tema consiste en comprender {main_concept}. {sec1_text} En el contexto de {request.nicho_sector}, esto se traduce en garantizar la coherencia de datos y reducir la complejidad operativa."
-                },
-                {
-                    "encabezado": f"Paso 2: Arquitectura y Aplicación de {sec_concept}",
-                    "contenido": f"Una vez sentado el fundamento, se procede a implementar {sec_concept}. {sec2_text} Esta fase permite desacoplar los módulos principales y estructurar flujos de trabajo eficientes."
-                },
-                {
-                    "encabezado": "Paso 3: Verificación, Benchmarks y Buenas Prácticas",
-                    "contenido": f"Para finalizar la adaptación técnica, es crucial validar el comportamiento del sistema. {sec3_text} Se recomienda establecer monitoreo continuo e inspeccionar los registros de auditoría."
-                }
-            ]
+        if request.formato_salida in ["Tutorial", "Guía Práctica Paso a Paso", "Tutorial / Guía Práctica", "Guía Práctica Paso a Paso (Tutorial)"]:
+            secciones = []
+            for i in range(1, count + 1):
+                fact_idx = (i - 1) % len(facts) if facts else 0
+                concept_idx = (i - 1) % len(concepts) if concepts else 0
+                fact_text = facts[fact_idx] if facts else f"Profundización en la sección {i} de {doc_title}."
+                concept_text = concepts[concept_idx] if concepts else f"Concepto Clave {i}"
+                secciones.append({
+                    "encabezado": f"Paso {i}: {concept_text} - Aplicación en {request.nicho_sector}",
+                    "contenido": f"En el Paso {i}, se aborda {concept_text}. {fact_text} Este contenido ha sido estructurado para el nivel {request.nivel_detalle} del perfil {request.perfil_destinatario}.{additional_info}"
+                })
 
             return ContenidoAdaptado(
                 titulo=titulo,
                 introduccion_contextualizada=intro,
-                resumen_ejecutivo=f"Guía paso a paso diseñada para {request.perfil_destinatario}. Explora desde los fundamentos hasta la verificación de {doc_title}.",
+                resumen_ejecutivo=f"Guía paso a paso en {count} módulos diseñada para {request.perfil_destinatario}. Explora desde los fundamentos hasta la verificación de {doc_title}.",
                 secciones_tutorial=secciones
             )
 
         # 2. FORMATO: QUIZ INTERACTIVO
         elif request.formato_salida in ["Quiz", "Quiz Interactivo con Justificaciones"]:
-            quizzes = [
-                QuizItem(
-                    pregunta=f"¿Cuál es el objetivo primordial de {main_concept} según el documento estudiado?",
-                    opciones=[
-                        f"Potenciar la precisión y fundamentación de las respuestas reduciendo alucinaciones",
-                        f"Eliminar la necesidad de bases de datos vectoriales en producción",
-                        f"Reemplazar por completo los modelos de lenguaje por scripts estáticos",
-                        f"Aumentar el consumo de recursos sin mejorar la calidad del texto"
-                    ],
-                    respuesta_correcta=f"Potenciar la precisión y fundamentación de las respuestas reduciendo alucinaciones",
-                    justificacion_didactica=f"El documento '{doc_title}' demuestra que integrar {main_concept} ancla la inferencia directamente en las fuentes verificables."
-                ),
-                QuizItem(
-                    pregunta=f"Al aplicar la arquitectura a la industria de {request.nicho_sector}, ¿qué ventaja destaca?",
-                    opciones=[
-                        f"Trazabilidad obligatoria y adecuación al perfil de {request.perfil_destinatario}",
-                        "Pérdida de rendimiento en secuencias de código largas",
-                        "Incapacidad de responder preguntas multidocumento",
-                        "Dependencia de servidores locales sin acceso a la nube"
-                    ],
-                    respuesta_correcta=f"Trazabilidad obligatoria y adecuación al perfil de {request.perfil_destinatario}",
-                    justificacion_didactica=f"Permite personalizar la densidad conceptual y adaptar las métricas pedagógicas al perfil elegido."
+            quizzes = []
+            for i in range(1, count + 1):
+                concept_idx = (i - 1) % len(concepts) if concepts else 0
+                concept_text = concepts[concept_idx] if concepts else main_concept
+                fact_idx = (i - 1) % len(facts) if facts else 0
+                fact_text = facts[fact_idx] if facts else f"aspecto clave {i} de {doc_title}"
+                quizzes.append(
+                    QuizItem(
+                        pregunta=f"Pregunta {i}: ¿Cuál es la implicación principal de {concept_text} en {doc_title}?",
+                        opciones=[
+                            f"Potenciar {fact_text[:100]}...",
+                            f"Eliminar los controles de calidad en {request.nicho_sector}",
+                            f"Desactivar la trazabilidad pedagógica del sistema",
+                            f"Reemplazar componentes validados por código arbitrario"
+                        ],
+                        respuesta_correcta=f"Potenciar {fact_text[:100]}...",
+                        justificacion_didactica=f"El análisis de '{doc_title}' demuestra que {concept_text} es fundamental para {request.perfil_destinatario}.{additional_info}"
+                    )
                 )
-            ]
 
             return ContenidoAdaptado(
-                titulo=f"Quiz de Evaluación: {doc_title}",
+                titulo=f"Quiz de Evaluación ({count} Preguntas): {doc_title}",
                 introduccion_contextualizada=intro,
                 quizzes=quizzes
             )
 
         # 3. FORMATO: RESUMEN EJECUTIVO (TL;DR)
         elif request.formato_salida in ["TLDR", "Resumen Ejecutivo (TL;DR)"]:
+            secciones = []
+            for i in range(1, count + 1):
+                concept_idx = (i - 1) % len(concepts) if concepts else 0
+                concept_text = concepts[concept_idx] if concepts else main_concept
+                secciones.append({
+                    "encabezado": f"Sección {i}: Síntesis de {concept_text}",
+                    "contenido": f"Estrategia e impacto para {request.perfil_destinatario}: Optimización operativa en {request.nicho_sector}.{additional_info}"
+                })
+
+            summary_bullet_points = [
+                f"{i}. {concepts[(i-1)%len(concepts)] if concepts else 'Punto ' + str(i)}: {facts[(i-1)%len(facts)] if facts else 'Síntesis ejecutiva de la sección.'}"
+                for i in range(1, count + 1)
+            ]
+
             return ContenidoAdaptado(
-                titulo=f"Resumen Ejecutivo: {doc_title}",
+                titulo=f"Resumen Ejecutivo (TL;DR): {doc_title}",
                 introduccion_contextualizada=intro,
-                resumen_ejecutivo=f"SÍNTESIS EJECUTIVA (TL;DR):\n\n1. Visión Estratégica: El documento aborda la transformación mediante {main_concept}.\n2. Impacto Operativo: Optimiza el flujo en el sector {request.nicho_sector}, permitiendo a un {request.perfil_destinatario} tomar decisiones informadas.\n3. Principales Hallazgos: {facts[0] if facts else 'Reducción de latencia y fundamentación estricta en fuentes de conocimiento.'}",
-                secciones_tutorial=[
-                    {"encabezado": "Implicaciones Clave", "contenido": f"La adopción de {main_concept} y {sec_concept} garantiza alta fidelidad técnica y escalabilidad."}
-                ]
+                resumen_ejecutivo=f"SÍNTESIS EJECUTIVA DE {doc_title.toUpperCase()} ({count} PUNTOS CLAVE):\n\n" + "\n".join(summary_bullet_points),
+                secciones_tutorial=secciones
             )
 
         # 4. FORMATO DEFAULT: FLASHCARDS
         else:
-            items = [
-                FlashcardItem(
-                    frente=f"¿Qué representa el concepto de {main_concept}?",
-                    dorso=f"Es el pilar fundamental identificado en '{doc_title}', orientado a estructurar y fundamentar el conocimiento.",
-                    pista_didactica=f"Piensa en {main_concept} como el ancla conceptual principal."
-                ),
-                FlashcardItem(
-                    frente=f"¿Cómo beneficia esta arquitectura a un {request.perfil_destinatario}?",
-                    dorso=f"Permite adaptar la jerga técnica al nivel de profundidad y tono didáctico deseado sin perder rigor.",
-                    pista_didactica=f"Adecuación pedagógica según la Taxonomía de Bloom."
+            items = []
+            for i in range(1, count + 1):
+                concept_idx = (i - 1) % len(concepts) if concepts else 0
+                concept_text = concepts[concept_idx] if concepts else main_concept
+                fact_idx = (i - 1) % len(facts) if facts else 0
+                fact_text = facts[fact_idx] if facts else f"Concepto didáctico {i} derivado de {doc_title}"
+                items.append(
+                    FlashcardItem(
+                        frente=f"Card #{i}: ¿Qué representa el concepto de {concept_text}?",
+                        dorso=f"Es un pilar identificado en '{doc_title}', orientado a estructurar la información para {request.perfil_destinatario}. {fact_text}.{additional_info}",
+                        pista_didactica=f"Considera la relación entre {concept_text} y el marco de {request.nicho_sector}."
+                    )
                 )
-            ]
 
             return ContenidoAdaptado(
                 titulo=titulo,
