@@ -70,9 +70,14 @@ Construye una red semántica representada en un Grafo Acíclico Dirigido (DAG):
 
 ---
 
-## 3. Orquestación de Agentes con Google Gemini y LangGraph
+## 3. Orquestación de Ecosistema Multi-Agente y LangGraph
 
-El flujo de generación de contenido no depende de un único prompt extenso, sino de un **Grafo de Estados de 5 Nodos Agénticos** orquestados mediante **LangGraph**:
+El flujo de generación de contenido ya no depende de un único modelo, sino de un **Enrutador Inteligente (MultiAgentRouter)** que asigna la carga de trabajo a un **Ecosistema Multi-Agente** basado en la complejidad de la tarea:
+* **GEMINI:** Investigaciones profundas y análisis pesados.
+* **GROQ:** Generación de latencia ultrabaja (Llama-3) para Quizzes y Flashcards.
+* **OLLAMA / QWEN_VL:** Modelos locales o multimodales especializados en diagramas y fallback.
+
+El grafo de estados general orquesta estas llamadas:
 
 ```mermaid
 graph TD
