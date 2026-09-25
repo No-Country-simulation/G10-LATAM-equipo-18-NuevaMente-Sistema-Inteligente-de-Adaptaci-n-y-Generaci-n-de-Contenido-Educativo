@@ -1,3 +1,18 @@
+import sys
+from pathlib import Path
+
+# Ensure UTF-8 output on Windows console
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except AttributeError:
+        pass
+
+# Add backend directory to sys.path so app modules can be imported
+backend_dir = Path(__file__).resolve().parents[1]
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
 from fastapi.testclient import TestClient
 from main import app
 
@@ -19,6 +34,8 @@ def test_adapt_content_endpoint():
     }
     
     response = client.post("/api/v1/adapt-content", json=payload)
+    if response.status_code != 200:
+        print("Response error:", response.status_code, response.text)
     assert response.status_code == 200
     
     data = response.json()
@@ -28,3 +45,13 @@ def test_adapt_content_endpoint():
     assert "evaluacion_calidad" in data
     assert "almacenamiento_oci" in data
     assert data["evaluacion_calidad"]["anclaje_fuente_score"] >= 0.90
+
+
+if __name__ == "__main__":
+    print("Testing health check...")
+    test_health_check()
+    print("✓ Health check passed.")
+
+    print("Testing adapt content endpoint (backward compatibility)...")
+    test_adapt_content_endpoint()
+    print("✓ Adapt content endpoint passed successfully!")
