@@ -100,7 +100,15 @@ class IngesterService:
     # Text extractors
     # ---------------------------------------------------------------------------
     def extract_text_from_pdf(self, filepath: Path) -> str:
-        """Extracts text from PDF, removes headers/footers, and tags page numbers."""
+        """Extracts text from PDF, preferentially using PdfParserService (pymupdf4llm) for Markdown structure."""
+        from app.services.pdf_parser_service import PdfParserService # noqa: PLC0415
+        
+        pdf_parser = PdfParserService()
+        if pdf_parser.is_available:
+            return pdf_parser.parse_pdf_to_markdown(str(filepath))
+            
+        # Legacy fallback
+        from pypdf import PdfReader # noqa: PLC0415
         reader = PdfReader(str(filepath))
         pages_text = [page.extract_text() or "" for page in reader.pages]
         cleaned_pages = self.remove_repeated_lines(pages_text)
@@ -216,7 +224,11 @@ class IngesterService:
 
     def detect_sections(self, text: str, extension: str) -> List[Section]:
         if extension == ".pdf":
-            return self.parse_pdf_pages(text)
+            if "[PÁGINA" in text:
+                return self.parse_pdf_pages(text)
+            else:
+                # Extraído vía pymupdf4llm (Markdown)
+                return self.parse_markdown_sections(text)
         elif extension in (".md", ".markdown"):
             return self.parse_markdown_sections(text)
         elif extension == ".txt":

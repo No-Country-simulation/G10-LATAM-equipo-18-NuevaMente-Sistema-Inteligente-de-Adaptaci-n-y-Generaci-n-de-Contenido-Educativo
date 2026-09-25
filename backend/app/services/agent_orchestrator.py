@@ -17,6 +17,8 @@ import math
 from typing import Dict, Any, List
 
 from app.infrastructure.gemini_client import GeminiClient
+from app.infrastructure.groq_client import GroqClient
+from app.services.multi_agent_router import MultiAgentRouter
 from app.schemas.adaptation import (
     AdaptationRequest,
     AdaptationResponse,
@@ -34,6 +36,8 @@ from app.prompts.prompt_loader import load_prompt
 class AgentOrchestrator:
     def __init__(self):
         self.gemini_client = GeminiClient()
+        self.groq_client = GroqClient()
+        self.router = MultiAgentRouter()
         self.oci_service = OCIStorageService()
 
     def run_pipeline(
@@ -67,50 +71,68 @@ class AgentOrchestrator:
         INSTRUCCIONES DE FORMATO JSON:
         Devuelve un JSON con esta estructura exacta (NO USES MARKDOWN ```json, solo el objeto crudo):
         {{
-            "metadata": {{
-                "profile_applied": "{request.recipient_profile}",
-                "format_generated": "{request.output_format}",
-                "estimated_study_time_minutes": 15,
-                "key_concepts": {key_concepts},
-                "prerequisites": {prerequisites}
+            "metadatos": {{
+                "perfil_aplicado": "{request.recipient_profile}",
+                "formato_generado": "{request.output_format}",
+                "tiempo_estimado_estudio_minutos": 15,
+                "conceptos_clave": {key_concepts},
+                "prerrequisitos": {prerequisites}
             }},
-            "adapted_content": {{
-                "title": "Un título atractivo",
-                "contextualized_introduction": "Introducción adaptada...",
-                "executive_summary": "resumen o null",
-                "items": [{{"front": "...", "back": "...", "hint": "..."}}],
-                "quizzes": [{{"question": "...", "options": ["..."], "correct_answer": "...", "didactic_justification": "..."}}],
-                "tutorial_sections": [{{"encabezado": "...", "contenido": "..."}}]
+            "contenido_adaptado": {{
+                "titulo": "Un título atractivo",
+                "introduccion_contextualizada": "Introducción adaptada...",
+                "resumen_ejecutivo": "resumen o null",
+                "items": [{{"frente": "...", "dorso": "...", "pista_didactica": "..."}}],
+                "quizzes": [{{"pregunta": "...", "opciones": ["..."], "respuesta_correcta": "...", "justificacion_didactica": "..."}}],
+                "secciones_tutorial": [{{"encabezado": "...", "contenido": "..."}}]
             }},
-            "quality_evaluation": {{
-                "source_grounding_score": 0.95,
-                "pedagogical_clarity": "Alta",
-                "observations": "Breve nota sobre las analogías"
+            "evaluacion_calidad": {{
+                "anclaje_fuente_score": 0.95,
+                "claridad_pedagogica": "Alta",
+                "observaciones": "Breve nota sobre las analogías"
             }}
         }}
-        Nota importante: Asegúrate de llenar 'items', 'quizzes' o 'tutorial_sections' dependiendo estrictamente del formato de salida solicitado. Los que no apliquen déjalos en null o array vacío.
+        Nota importante: Asegúrate de llenar 'items', 'quizzes' o 'secciones_tutorial' dependiendo estrictamente del formato de salida solicitado. Los que no apliquen déjalos en null o array vacío.
         """
 
         import json
         import math
+        
+        # Enrutamiento Inteligente
+        best_agent = self.router.route_task(
+            output_format=request.output_format, 
+            task_description=request.title
+        )
+        print(f"🧠 [Multi-Agent Router] Delegando tarea a: {best_agent} (Formato: {request.output_format})")
+
         try:
-            raw_response = self.gemini_client.generate_content(
-                prompt=prompt,
-                system_instruction=system_instruction,
-                model_name="gemini-2.5-flash",
-                json_output=True
-            )
+            if best_agent == "GROQ":
+                raw_response = self.groq_client.generate_content(
+                    prompt=prompt,
+                    system_instruction=system_instruction,
+                    json_output=True
+                )
+            else:
+                raw_response = self.gemini_client.generate_content(
+                    prompt=prompt,
+                    system_instruction=system_instruction,
+                    model_name="gemini-2.5-flash",
+                    json_output=True
+                )
             # Limpiar posible markdown si Gemini se equivoca e ignora la orden
             raw_response = raw_response.strip().removeprefix("```json").removesuffix("```").strip()
             parsed_data = json.loads(raw_response)
             
-            metadata = ResponseMetadata(**parsed_data.get("metadata", {}))
-            adapted_content = AdaptedContent(**parsed_data.get("adapted_content", {}))
-            evaluation = QualityEvaluation(**parsed_data.get("quality_evaluation", {}))
+            # Usar las llaves en español que coinciden con los aliases de Pydantic
+            metadata = ResponseMetadata(**parsed_data.get("metadatos", parsed_data.get("metadata", {})))
+            adapted_content = AdaptedContent(**parsed_data.get("contenido_adaptado", parsed_data.get("adapted_content", {})))
+            evaluation = QualityEvaluation(**parsed_data.get("evaluacion_calidad", parsed_data.get("quality_evaluation", {})))
             
         except Exception as e:
             # Fallback en caso de error de parseo o de API
             print(f"Error generando contenido (usando fallback): {e}")
+            raw_preview = str(raw_response)[:800] if 'raw_response' in locals() else "No response"
+            
             metadata = ResponseMetadata(
                 profile_applied=request.recipient_profile,
                 format_generated=request.output_format,
@@ -123,7 +145,7 @@ class AgentOrchestrator:
                 contextualized_introduction="Generación automática falló, modo fallback activado.",
                 tutorial_sections=[{"encabezado": "Error", "contenido": "No se pudo generar el JSON."}]
             )
-            evaluation = QualityEvaluation(source_grounding_score=0.0, pedagogical_clarity="Baja", observations=str(e))
+            evaluation = QualityEvaluation(source_grounding_score=0.0, pedagogical_clarity="Baja", observations=f"Error: {str(e)} | RAW: {raw_preview}")
 
         # Sanitize object name for OCI upload
         sanitized_title = "".join(c if c.isalnum() else "-" for c in request.title.lower())[:15]

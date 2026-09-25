@@ -21,18 +21,12 @@ def cosine_similarity(v1: List[float], v2: List[float]) -> float:
         return 0.0
     return float(dot / (norm1 * norm2))
 
+from app.infrastructure.cohere_client import CohereClient
+
 class HybridRAGService:
     def __init__(self, embedding_service: EmbeddingService):
         self.embedding_service = embedding_service
-        
-        # Inicializa el cliente Cohere para el Reranker si la API key está disponible
-        self.cohere_api_key = getattr(settings, "COHERE_API_KEY", None)
-        if self.cohere_api_key:
-            self.co_client = cohere.ClientV2(self.cohere_api_key)
-            logger.info("Cohere Reranker client initialized.")
-        else:
-            self.co_client = None
-            logger.warning("COHERE_API_KEY no encontrada. El reordenamiento (Reranking) será desactivado.")
+        self.co_client = CohereClient()
 
     def retrieve_top_passages(
         self,
@@ -115,7 +109,7 @@ class HybridRAGService:
                 candidates_for_rerank.append(parent_obj)
         
         # Si no tenemos API de Cohere o no hay candidatos, devolvemos el resultado de RRF
-        if not self.co_client or len(candidates_for_rerank) == 0:
+        if not getattr(self.co_client, "client", None) or len(candidates_for_rerank) == 0:
             return candidates_for_rerank[:top_k]
             
         # ---------------------------------------------------------

@@ -134,23 +134,11 @@ class EmbeddingService:
     # ── Private: Jina ──────────────────────────────────────────────────────────
 
     def _embed_jina_batch(self, texts: List[str]) -> List[List[float]]:
-        import requests  # noqa: PLC0415
-        headers = {
-            "Authorization": f"Bearer {settings.JINA_API_KEY}",
-            "Content-Type": "application/json",
-        }
-        payload = {"model": self.model_name, "input": texts}
+        from app.infrastructure.jina_client import JinaClient  # noqa: PLC0415
+        
         try:
-            response = requests.post(
-                "https://api.jina.ai/v1/embeddings",
-                headers=headers,
-                json=payload,
-                timeout=30,
-            )
-            response.raise_for_status()
-            data = response.json()
-            # Jina returns results sorted by index.
-            return [item["embedding"] for item in sorted(data["data"], key=lambda x: x["index"])]
+            client = JinaClient()
+            return client.embed_batch(texts, self.model_name)
         except Exception as exc:
             logger.warning("Jina embedding failed (%s). Falling back to cascade.", exc)
             return [self._fallback_embed(t, failed_provider="jina") for t in texts]
