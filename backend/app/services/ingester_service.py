@@ -345,7 +345,7 @@ class IngesterService:
             import logging
             logging.getLogger().info("Cargando modelo KeyBERT ligero...")
             kw_model = KeyBERT(model="all-MiniLM-L6-v2")
-        except ImportError:
+        except Exception:
             kw_model = None
         parent_chunks: List[Dict[str, Any]] = []
         child_chunks: List[Dict[str, Any]] = []
