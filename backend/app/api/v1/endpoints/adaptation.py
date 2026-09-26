@@ -65,6 +65,8 @@ async def adapt_content(request: AdaptationRequest):
         return response
 
     except Exception as error:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error en la adaptación de contenido: {str(error)}",
