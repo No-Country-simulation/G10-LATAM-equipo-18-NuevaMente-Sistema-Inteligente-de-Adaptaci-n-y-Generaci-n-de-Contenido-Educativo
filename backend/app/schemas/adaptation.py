@@ -29,6 +29,7 @@ class AdaptationRequest(BaseModel):
     niche: str = Field(default="general", alias="nicho_sector")
     detail_level: str = Field(default="didactic", alias="nivel_detalle")
     quantity: Optional[int] = Field(default=5, alias="cantidad_generar")
+    chunk_size: Optional[int] = Field(default=500, alias="tamano_chunk", description="Tamaño de fragmentación (chunks) para el procesamiento RAG (100 - 2000)")
     additional_instructions: Optional[str] = Field(default=None, alias="instrucciones_adicionales")
 
 

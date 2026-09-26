@@ -114,12 +114,12 @@ import { AdaptationRequest, AdaptationResponse } from '../../core/models/adaptat
         </div>
       </div>
 
-      <!-- STEP 2: PERSONALIZACIÓN -->
+      <!-- STEP 2: PERSONALIZACIÓN CON CONTROL DE CHUNKING DE MARKETING -->
       <div *ngIf="currentStep === 2" class="step-content">
         <div class="step-heading">
           <div class="step-tag">CREAR</div>
           <h1 class="step-title">Personalización del contenido</h1>
-          <p class="step-subtitle">Configura cómo deseas adaptar el material.</p>
+          <p class="step-subtitle">Configura cómo deseas adaptar el material y la densidad de lectura de la IA.</p>
         </div>
 
         <div class="personalization-grid">
@@ -170,6 +170,54 @@ import { AdaptationRequest, AdaptationResponse } from '../../core/models/adaptat
                 <option value="Ejecutivo">Ejecutivo</option>
               </select>
               <span class="form-subtext">¿Qué tan profundo debe ser el contenido?</span>
+            </div>
+
+            <!-- MARKETING CHUNKING SLIDER & RECOMMENDATION CONTROL -->
+            <div class="form-group chunking-card-group">
+              <div class="chunking-header">
+                <label class="chunking-title-label">
+                  🧩 Granularidad & Memoria RAG (Chunk Size)
+                </label>
+                <span 
+                  class="chunking-badge" 
+                  [style.background]="chunkRecommendationInfo.bgLight" 
+                  [style.color]="chunkRecommendationInfo.color"
+                >
+                  {{ chunkRecommendationInfo.badgeText }}
+                </span>
+              </div>
+              <span class="form-subtext">Controla el tamaño exacto de los fragmentos de texto enviados al procesamiento de LLMs (100 a 2000 caracteres por chunk).</span>
+
+              <!-- Interactive Color Slider -->
+              <div class="slider-wrapper">
+                <input 
+                  type="range" 
+                  class="chunk-slider" 
+                  min="100" 
+                  max="2000" 
+                  step="50" 
+                  [(ngModel)]="tamanoChunk" 
+                />
+                <div class="slider-readout">
+                  <span class="chunk-val-badge" [style.background]="chunkRecommendationInfo.color">
+                    {{ tamanoChunk }} caracteres / chunk
+                  </span>
+                </div>
+              </div>
+
+              <!-- Recommendation Note Box -->
+              <div 
+                class="chunk-recommendation-box" 
+                [style.borderLeftColor]="chunkRecommendationInfo.color" 
+                [style.background]="chunkRecommendationInfo.bgLight"
+              >
+                <div class="note-title" [style.color]="chunkRecommendationInfo.color">
+                  {{ chunkRecommendationInfo.title }}
+                </div>
+                <div class="note-text" [style.color]="chunkRecommendationInfo.color">
+                  {{ chunkRecommendationInfo.note }}
+                </div>
+              </div>
             </div>
 
             <div class="form-group">
@@ -225,6 +273,17 @@ import { AdaptationRequest, AdaptationResponse } from '../../core/models/adaptat
                 <div>
                   <div class="item-label">Nivel de profundidad</div>
                   <div class="item-value">{{ nivelDetalle }}</div>
+                </div>
+              </div>
+
+              <!-- CHUNKING SUMMARY ITEM -->
+              <div class="summary-item">
+                <span class="item-icon">🧩</span>
+                <div>
+                  <div class="item-label">Granularidad RAG (Chunks)</div>
+                  <div class="item-value" [style.color]="chunkRecommendationInfo.color">
+                    {{ tamanoChunk }} caracteres
+                  </div>
                 </div>
               </div>
 
@@ -453,6 +512,7 @@ import { AdaptationRequest, AdaptationResponse } from '../../core/models/adaptat
       list-style: none;
       display: flex;
       gap: 2rem;
+      padding-left: 0;
     }
     .requirements-box li {
       font-size: 0.85rem;
@@ -500,6 +560,93 @@ import { AdaptationRequest, AdaptationResponse } from '../../core/models/adaptat
       font-size: 0.85rem;
       color: #64748b;
       margin-bottom: 2rem;
+    }
+
+    /* Marketing Chunking Field & Color Slider */
+    .chunking-card-group {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 1.75rem;
+    }
+    .chunking-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.25rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .chunking-title-label {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .chunking-badge {
+      font-size: 0.78rem;
+      font-weight: 800;
+      padding: 0.25rem 0.75rem;
+      border-radius: 12px;
+      letter-spacing: 0.02em;
+    }
+    .slider-wrapper {
+      margin: 1.25rem 0 1rem 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .chunk-slider {
+      width: 100%;
+      height: 8px;
+      border-radius: 5px;
+      outline: none;
+      background: linear-gradient(90deg, #0284c7 0%, #059669 30%, #d97706 70%, #e11d48 100%);
+      cursor: pointer;
+      -webkit-appearance: none;
+    }
+    .chunk-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3px solid #2563eb;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+    .chunk-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+    .slider-readout {
+      display: flex;
+      justify-content: flex-end;
+    }
+    .chunk-val-badge {
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 0.85rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .chunk-recommendation-box {
+      border-left: 4px solid #059669;
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      margin-top: 0.75rem;
+    }
+    .note-title {
+      font-size: 0.88rem;
+      font-weight: 800;
+      margin-bottom: 0.25rem;
+    }
+    .note-text {
+      font-size: 0.82rem;
+      line-height: 1.4;
+      font-weight: 500;
     }
 
     .summary-panel {
@@ -598,7 +745,45 @@ export class StepperCreationComponent implements OnInit {
   nichoSector: string = 'General';
   nivelDetalle: string = 'Didáctico';
   cantidadGenerar: number = 5;
+  tamanoChunk: number = 500;
   instruccionesAdicionales: string = '';
+
+  get chunkRecommendationInfo(): { title: string; badgeText: string; color: string; bgLight: string; note: string } {
+    const val = Number(this.tamanoChunk);
+    if (val < 350) {
+      return {
+        title: 'Granularidad Ultra-Fina (Precisión Puntual)',
+        badgeText: '🔵 Ultra-Granular (100 - 300 Chunks)',
+        color: '#0284c7',
+        bgLight: '#e0f2fe',
+        note: '💡 Nota de Recomendación RAG: Fragmentos pequeños (100 - 300 caracteres) maximizan la precisión en la recuperación de fórmulas, variables o definiciones aisladas. Ideal para glosarios técnicos.'
+      };
+    } else if (val <= 700) {
+      return {
+        title: 'Equilibrio Óptimo Recomendado (500 Chunks)',
+        badgeText: '🟢 Recomendado NuevaMente (350 - 700 Chunks)',
+        color: '#059669',
+        bgLight: '#d1fae5',
+        note: '🌟 Nota de Recomendación Oficial: 500 caracteres por chunk es la configuración recomendada por NuevaMente. Ofrece el balance idóneo entre riqueza semántica y velocidad en el procesamiento de Gemini 1.5 Pro y Groq.'
+      };
+    } else if (val <= 1300) {
+      return {
+        title: 'Contexto Amplio de Párrafos',
+        badgeText: '🟡 Contexto Amplio (750 - 1300 Chunks)',
+        color: '#d97706',
+        bgLight: '#fef3c7',
+        note: '⚠️ Nota de Contexto Amplio: Fragmentos medianos (750 - 1300 caracteres) preservan párrafos completos y estructuras complejas. Recomendado para Resúmenes Ejecutivos TL;DR.'
+      };
+    } else {
+      return {
+        title: 'Macro-Contexto de Capítulos Completo',
+        badgeText: '🔴 Macro-Contexto (1350 - 2000 Chunks)',
+        color: '#e11d48',
+        bgLight: '#ffe4e6',
+        note: '🔥 Nota Macro: Fragmentos extensos (1350 - 2000 caracteres) analizan bloques masivos de información. Recomendado para evaluación holística de manuales extensos sin segmentación excesiva.'
+      };
+    }
+  }
 
   get cantidadLabel(): string {
     if (this.formatoSalida.includes('Flashcard')) {
@@ -697,7 +882,7 @@ export class StepperCreationComponent implements OnInit {
     const interval = setInterval(() => {
       this.progressVal += 15;
       if (this.progressVal === 25) {
-        this.pipelineStage = 'Chunking semántico & FAISS Vector Indexing';
+        this.pipelineStage = `Chunking semántico (${this.tamanoChunk} chars) & FAISS Vector Indexing`;
       } else if (this.progressVal === 55) {
         this.pipelineStage = 'Grafo Graph RAG & LangGraph Agent Orquestation';
       } else if (this.progressVal === 78) {
@@ -716,6 +901,7 @@ export class StepperCreationComponent implements OnInit {
       nicho_sector: this.nichoSector,
       nivel_detalle: this.nivelDetalle,
       cantidad_generar: this.cantidadGenerar,
+      tamano_chunk: this.tamanoChunk,
       instrucciones_adicionales: this.instruccionesAdicionales
     };
 
