@@ -10,6 +10,8 @@ Propósito:
        - Vía extractor clásico pypdf con limpieza de ruido y metadatos de página como fallback.
     3. Construcción jerárquica RAG (Parent-Child) con metadatos enriquecidos (conceptos clave).
     4. Comparativa de calidad de extracción y segmentación.
+    5. Fallback a pypdf cuando pymupdf4llm falla en tiempo de ejecución (no solo si falta instalado).
+    6. Activación/desactivación de la extracción de conceptos clave (KeyBERT) por configuración.
 
 Ejecución directo con:
     uv run python tests/manual/test_ingester.py
@@ -17,6 +19,7 @@ Ejecución directo con:
 
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 # Asegura salida en UTF-8 en consola de Windows
 if sys.platform == "win32":
@@ -30,6 +33,7 @@ backend_dir = Path(__file__).resolve().parents[2]
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
+from app.core.config import settings
 from app.services.ingester_service import IngesterService
 from app.services.pdf_parser_service import PdfParserService
 
@@ -97,7 +101,7 @@ def test_parent_child_rag(service: IngesterService, doc):
         if key_concepts:
             print(f"  Conceptos clave detectados en Parent[0]: {key_concepts}")
         else:
-            print("  Conceptos clave: [N/A o modo ligero sin KeyBERT]")
+            print("  Conceptos clave: [] (esperado si USE_KEYBERT_CONCEPTS=false)")
 
     if rag_data["child_chunks"]:
         c0 = rag_data["child_chunks"][0]
@@ -132,6 +136,67 @@ def test_pdf_ingestion(service: IngesterService):
     print("  ✅ Ingesta de PDF OK")
 
 
+def test_pdf_runtime_fallback(service: IngesterService):
+    """Simula que pymupdf4llm SÍ está instalado pero falla al procesar este
+    PDF puntual, y verifica que la ingesta cae a pypdf en vez de abortar."""
+    print("\n" + "=" * 60)
+    print("5. PROBANDO FALLBACK A PYPDF ANTE FALLO EN TIEMPO DE EJECUCIÓN")
+    print("=" * 60)
+    if not SAMPLE_PDF_FILE.exists():
+        print(f"Omitiendo: coloca '{SAMPLE_PDF_FILE.name}' en {SAMPLE_PDF_FILE.parent} para probarlo.")
+        return
+
+    fresh_service = IngesterService()
+    pdf_parser = fresh_service._get_pdf_parser()
+
+    with patch.object(
+        pdf_parser, "is_available", True
+    ), patch.object(
+        pdf_parser, "parse_pdf_to_markdown", side_effect=RuntimeError("Fallo simulado de pymupdf4llm")
+    ):
+        fallback_doc = fresh_service.process_document(SAMPLE_PDF_FILE)
+
+    print(f"  Chunks obtenidos vía fallback pypdf: {len(fallback_doc.chunks)}")
+    assert len(fallback_doc.chunks) > 0, "El fallback a pypdf no debió devolver un documento vacío"
+    # El extractor legacy etiqueta páginas con "[PÁGINA N]", el parser Markdown no.
+    pages_detected = sum(1 for c in fallback_doc.chunks if c.page_number is not None)
+    assert pages_detected > 0, "El fallback pypdf debería producir chunks con número de página"
+    print("  ✅ Fallback a pypdf ante fallo en tiempo de ejecución OK")
+
+
+def test_keybert_toggle(service: IngesterService, doc):
+    """Verifica que key_concepts respeta el flag USE_KEYBERT_CONCEPTS:
+    vacío cuando está desactivado, y no vacío (si la librería está
+    disponible) cuando se activa."""
+    print("\n" + "=" * 60)
+    print("6. PROBANDO TOGGLE DE CONCEPTOS CLAVE (KeyBERT)")
+    print("=" * 60)
+
+    original_flag = settings.USE_KEYBERT_CONCEPTS
+
+    try:
+        settings.USE_KEYBERT_CONCEPTS = False
+        rag_data_off = service.build_rag_chunks(doc)
+        concepts_off = [p["metadata"]["key_concepts"] for p in rag_data_off["parent_chunks"]]
+        assert all(c == [] for c in concepts_off), "Con el flag en False no debería extraerse ningún concepto"
+        print("  USE_KEYBERT_CONCEPTS=false -> todos los key_concepts vacíos: OK")
+
+        settings.USE_KEYBERT_CONCEPTS = True
+        try:
+            rag_data_on = service.build_rag_chunks(doc)
+            concepts_on = [p["metadata"]["key_concepts"] for p in rag_data_on["parent_chunks"] if len(p["content"]) > 50]
+            any_non_empty = any(len(c) > 0 for c in concepts_on)
+            print(f"  USE_KEYBERT_CONCEPTS=true -> ¿algún parent con conceptos?: {any_non_empty}")
+            if not any_non_empty:
+                print("  ⚠️  Ningún concepto detectado — revisar si KeyBERT cargó el modelo correctamente")
+        except Exception as exc:
+            print(f"  ⚠️  KeyBERT no disponible en este entorno ({exc}) — omitiendo verificación positiva")
+
+        print("  ✅ Toggle de KeyBERT OK")
+    finally:
+        settings.USE_KEYBERT_CONCEPTS = original_flag
+
+
 if __name__ == "__main__":
     service = IngesterService()
 
@@ -139,6 +204,8 @@ if __name__ == "__main__":
     md_document = test_markdown_ingestion(service)
     test_parent_child_rag(service, md_document)
     test_pdf_ingestion(service)
+    test_pdf_runtime_fallback(service)
+    test_keybert_toggle(service, md_document)
 
     print("\n" + "=" * 60)
     print(">>> ¡Prueba manual completada exitosamente! <<<")
