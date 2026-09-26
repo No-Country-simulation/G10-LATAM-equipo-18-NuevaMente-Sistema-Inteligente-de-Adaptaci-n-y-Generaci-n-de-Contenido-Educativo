@@ -43,12 +43,12 @@ class OCIStorageService:
                 logger.error(f"Error subiendo objeto a OCI: {e}")
 
         # Fallback local mock
-        base_dir = os.path.join(os.getcwd(), "storage_mock", bucket_name)
-        os.makedirs(base_dir, exist_ok=True)
-        file_path = os.path.join(base_dir, object_name)
-        
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(json_data, f, ensure_ascii=False, indent=2)
+        from pathlib import Path
+        base_dir = Path(os.getcwd()) / "storage_mock" / bucket_name
+        base_dir.mkdir(parents=True, exist_ok=True)
+        file_path = base_dir / object_name
+
+        file_path.write_text(json.dumps(json_data, ensure_ascii=False, indent=2), encoding="utf-8")
             
         return {
             "bucket": bucket_name,
