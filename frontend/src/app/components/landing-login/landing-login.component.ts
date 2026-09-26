@@ -4,6 +4,7 @@ import { ApiService } from '../../core/services/api.service';
 export interface LoginEvent {
   email: string;
   name: string;
+  token?: string;
 }
 
 @Component({
@@ -12,25 +13,25 @@ export interface LoginEvent {
     <div class="landing-page">
       <!-- Navbar header for Landing -->
       <header class="top-nav">
-        <div class="brand">
+        <div class="brand" (click)="scrollToSection('top')">
           <div class="logo-icon">🎓</div>
           <span class="brand-name">NuevaMente</span>
         </div>
 
         <nav class="nav-links">
-          <a href="#producto">Producto</a>
-          <a href="#beneficios">Beneficios</a>
-          <a href="#recursos">Recursos</a>
-          <a href="#precios">Precios</a>
+          <a (click)="scrollToSection('producto')">Producto</a>
+          <a (click)="scrollToSection('beneficios')">Beneficios</a>
+          <a (click)="scrollToSection('recursos')">Recursos</a>
+          <a (click)="scrollToSection('precios')">Precios</a>
         </nav>
 
-        <button class="btn btn-primary btn-access" (click)="toggleMode('register')">
+        <button class="btn btn-primary btn-access" (click)="activateRegisterMode()">
           Registrarse gratis
         </button>
       </header>
 
-      <!-- Main Landing Grid -->
-      <main class="landing-hero">
+      <!-- Hero Section & Auth Card -->
+      <section id="top" class="landing-hero">
         <!-- Left Hero Section -->
         <div class="hero-content">
           <div class="tag-pill">DOCUMENTACIÓN QUE ENSEÑA</div>
@@ -78,22 +79,51 @@ export interface LoginEvent {
           <div class="hero-footer-tagline">MISMA INFORMACIÓN, MÁS APRENDIZAJE.</div>
         </div>
 
-        <!-- Right Login / Register Box -->
-        <div class="login-wrapper">
+        <!-- Right Login / Register Card -->
+        <div class="login-wrapper" id="auth-card">
           <div class="login-card">
+            <!-- Mode Toggle Tabs -->
+            <div class="auth-tabs">
+              <button 
+                type="button" 
+                class="auth-tab-btn" 
+                [class.active]="!isRegisterMode" 
+                (click)="toggleMode('login')"
+              >
+                Iniciar sesión
+              </button>
+              <button 
+                type="button" 
+                class="auth-tab-btn" 
+                [class.active]="isRegisterMode" 
+                (click)="toggleMode('register')"
+              >
+                Registrarse gratis
+              </button>
+            </div>
+
             <h2 class="login-title">
               {{ isRegisterMode ? 'Crea tu cuenta' : 'Bienvenido de nuevo' }}
             </h2>
             <p class="login-subtitle">
-              {{ isRegisterMode ? 'Ingresa tus datos para registrarte' : 'Inicia sesión para continuar' }}
+              {{ isRegisterMode ? 'Ingresa tus datos para registrarte gratis' : 'Inicia sesión para continuar' }}
             </p>
 
+            <div *ngIf="errorMessage" class="alert-error">
+              ⚠️ {{ errorMessage }}
+            </div>
+
+            <div *ngIf="successMessage" class="alert-success">
+              ✅ {{ successMessage }}
+            </div>
+
             <form (ngSubmit)="onFormSubmit()" class="login-form">
-              <!-- Name Input (Shown in Register mode or optional in login) -->
-              <div class="form-group">
+              <!-- Name Input (Shown in Register mode) -->
+              <div class="form-group" *ngIf="isRegisterMode">
                 <label>Nombre Completo</label>
                 <input 
                   type="text" 
+                  id="name-input"
                   class="form-control" 
                   [(ngModel)]="name" 
                   name="name" 
@@ -143,8 +173,9 @@ export interface LoginEvent {
                 </label>
               </div>
 
-              <button type="submit" class="btn btn-primary btn-submit-login">
-                {{ isRegisterMode ? 'Crear mi cuenta' : 'Iniciar sesión' }}
+              <button type="submit" class="btn btn-primary btn-submit-login" [disabled]="isLoading">
+                <span *ngIf="!isLoading">{{ isRegisterMode ? 'Crear mi cuenta gratis' : 'Iniciar sesión' }}</span>
+                <span *ngIf="isLoading" class="spinner">⏳ Procesando...</span>
               </button>
 
               <div class="divider">
@@ -173,15 +204,195 @@ export interface LoginEvent {
             </form>
           </div>
         </div>
-      </main>
+      </section>
 
+      <!-- SECTION 1: PRODUCTO -->
+      <section id="producto" class="landing-section bg-white">
+        <div class="section-container">
+          <div class="section-badge">TECNOLOGÍA DE VANGUARDIA</div>
+          <h2 class="section-title">Arquitectura RAG Multimodal & Multi-Agente</h2>
+          <p class="section-subtitle">
+            Combina los mejores modelos de procesamiento de texto con grafos de conocimiento y re-ranking híbrido para una adaptación literaria y técnica impecable.
+          </p>
+
+          <div class="features-grid">
+            <div class="feature-card">
+              <div class="feature-icon">🧠</div>
+              <h3>RAG Híbrido + Re-ranking Cohere</h3>
+              <p>Búsqueda léxica BM25 combinada con similitud coseno densa y Reciprocal Rank Fusion (RRF) para recuperar los fragmentos con mayor precisión contextual.</p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon">🕸️</div>
+              <h3>Graph RAG & DAG de Conceptos</h3>
+              <p>Extracción semántica de conceptos clave y sus dependencias para construir un Grafo Acíclico Dirigido (DAG) que estructura el flujo de aprendizaje.</p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon">🤖</div>
+              <h3>Orquestación Multi-Agente LLM</h3>
+              <p>Ruteo inteligente entre Gemini 1.5 Pro, Gemini Flash y Groq Llama 3 para lograr la máxima velocidad sin comprometer la profundidad pedagógica.</p>
+            </div>
+
+            <div class="feature-card">
+              <div class="feature-icon">📄</div>
+              <h3>Generador PDF en OCI</h3>
+              <p>Exportación de documentos formativos con maquetación limpia a 0px de margen, listos para descargar o guardar en Oracle Cloud Infrastructure.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: BENEFICIOS -->
+      <section id="beneficios" class="landing-section bg-light">
+        <div class="section-container">
+          <div class="section-badge">VALOR MEDIBLE</div>
+          <h2 class="section-title">¿Por qué elegir NuevaMente?</h2>
+          <p class="section-subtitle">
+            Aumenta el compromiso y retención de conocimiento en equipos de ingeniería, tecnología y educación.
+          </p>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-number">85%</div>
+              <div class="stat-label">Ahorro de Tiempo</div>
+              <p class="stat-desc">Reduce horas de lectura manual transformando archivos extensos en minutos.</p>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-number">98%+</div>
+              <div class="stat-label">Anclaje a Fuentes</div>
+              <p class="stat-desc">Garantía de fidelidad estricta al documento original sin invención ni alucinaciones.</p>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-number">3x</div>
+              <div class="stat-label">Retención Didáctica</div>
+              <p class="stat-desc">Flashcards y quizzes interactivos diseñados según principios de repetición espaciada.</p>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-number">100%</div>
+              <div class="stat-label">Multi-Audiencia</div>
+              <p class="stat-desc">Personalización automática de tono y nivel de detalle desde Principiante a Experto.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 3: RECURSOS -->
+      <section id="recursos" class="landing-section bg-white">
+        <div class="section-container">
+          <div class="section-badge">RECURSOS & EJEMPLOS</div>
+          <h2 class="section-title">Explora Ejemplos de Contenido Adaptado</h2>
+          <p class="section-subtitle">
+            Prueba cómo la plataforma transforma documentación técnica real en experiencias formativas.
+          </p>
+
+          <div class="resources-grid">
+            <div class="resource-card">
+              <div class="resource-type">FLASHCARDS</div>
+              <h3>Redes VCN en Oracle Cloud</h3>
+              <p>Manual técnico de 40 páginas sintetizado en 10 tarjetas dinámicas con pistas didácticas.</p>
+              <button class="btn-link" (click)="activateRegisterMode()">Probar ejemplo ➔</button>
+            </div>
+
+            <div class="resource-card">
+              <div class="resource-type">QUIZ INTERACTIVO</div>
+              <h3>Evaluación de Microservicios</h3>
+              <p>Cuestionario de opción múltiple con justificación pedagógica en tiempo real para cada respuesta.</p>
+              <button class="btn-link" (click)="activateRegisterMode()">Probar ejemplo ➔</button>
+            </div>
+
+            <div class="resource-card">
+              <div class="resource-type">RESUMEN TL;DR</div>
+              <h3>Manual de Seguridad IAM</h3>
+              <p>Resumen ejecutivo estructurado en 5 puntos clave con terminología técnica contextualizada.</p>
+              <button class="btn-link" (click)="activateRegisterMode()">Probar ejemplo ➔</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SECTION 4: PRECIOS -->
+      <section id="precios" class="landing-section bg-light">
+        <div class="section-container">
+          <div class="section-badge">PLANES & PRECIOS</div>
+          <h2 class="section-title">Elige el plan ideal para tus necesidades</h2>
+          <p class="section-subtitle">
+            Comienza gratis hoy mismo y escala según el volumen de documentación de tu equipo.
+          </p>
+
+          <div class="pricing-grid">
+            <!-- Free Plan -->
+            <div class="pricing-card">
+              <div class="pricing-header">
+                <h3>Starter</h3>
+                <p>Ideal para probar el motor de adaptación</p>
+                <div class="price">$0 <span>/ mes</span></div>
+              </div>
+              <ul class="pricing-features">
+                <li>✓ 5 Adaptaciones de contenido al mes</li>
+                <li>✓ RAG Híbrido Estándar</li>
+                <li>✓ Flashcards y Quizzes interactivos</li>
+                <li>✓ Exportación PDF sin marcas</li>
+              </ul>
+              <button class="btn btn-outline btn-pricing" (click)="activateRegisterMode()">
+                Registrarse gratis
+              </button>
+            </div>
+
+            <!-- Pro Plan (Popular) -->
+            <div class="pricing-card popular">
+              <div class="popular-tag">MÁS POPULAR</div>
+              <div class="pricing-header">
+                <h3>Pro Educador</h3>
+                <p>Para ingenieros, docentes y creadores de contenido</p>
+                <div class="price">$19 <span>/ mes</span></div>
+              </div>
+              <ul class="pricing-features">
+                <li>✓ Adaptaciones ilimitadas</li>
+                <li>✓ Graph RAG & DAG de Conceptos</li>
+                <li>✓ Re-ranking multilingüe Cohere</li>
+                <li>✓ Personalización de perfil de audiencia</li>
+                <li>✓ Soporte prioritario por correo</li>
+              </ul>
+              <button class="btn btn-primary btn-pricing" (click)="activateRegisterMode()">
+                Registrarse gratis
+              </button>
+            </div>
+
+            <!-- Enterprise Plan -->
+            <div class="pricing-card">
+              <div class="pricing-header">
+                <h3>Enterprise</h3>
+                <p>Para empresas y equipos de alta escala</p>
+                <div class="price">$49 <span>/ mes</span></div>
+              </div>
+              <ul class="pricing-features">
+                <li>✓ Todo lo del plan Pro</li>
+                <li>✓ Integración privada OCI Storage</li>
+                <li>✓ API Dedicada & Conectores LMS</li>
+                <li>✓ Modelos ajustados a tu dominio</li>
+                <li>✓ Gestor de cuenta dedicado</li>
+              </ul>
+              <button class="btn btn-outline btn-pricing" (click)="activateRegisterMode()">
+                Registrarse gratis
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Footer -->
       <footer class="landing-footer">
         <div class="footer-links">
-          <a href="#">Privacidad</a>
-          <a href="#">Términos</a>
-          <a href="#">Contacto</a>
+          <a (click)="scrollToSection('top')">Inicio</a>
+          <a (click)="scrollToSection('producto')">Producto</a>
+          <a (click)="scrollToSection('beneficios')">Beneficios</a>
+          <a (click)="scrollToSection('precios')">Precios</a>
         </div>
-        <div class="footer-copy">Un futuro con más conocimiento.</div>
+        <div class="footer-copy">© 2026 NuevaMente - Sistema Inteligente de Adaptación Educativa.</div>
       </footer>
     </div>
   `,
@@ -191,6 +402,7 @@ export interface LoginEvent {
       background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
       display: flex;
       flex-direction: column;
+      font-family: system-ui, -apple-system, sans-serif;
     }
     .top-nav {
       display: flex;
@@ -199,11 +411,16 @@ export interface LoginEvent {
       padding: 1.25rem 4rem;
       background: #ffffff;
       border-bottom: 1px solid #e2e8f0;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.03);
     }
     .brand {
       display: flex;
       align-items: center;
       gap: 0.75rem;
+      cursor: pointer;
     }
     .logo-icon {
       font-size: 1.75rem;
@@ -219,11 +436,13 @@ export interface LoginEvent {
     }
     .nav-links a {
       color: #475569;
-      font-weight: 500;
+      font-weight: 600;
       font-size: 0.95rem;
+      cursor: pointer;
+      transition: color 0.2s;
     }
     .nav-links a:hover {
-      color: #3b82f6;
+      color: #2563eb;
     }
     .btn-access {
       padding: 0.6rem 1.25rem;
@@ -247,7 +466,7 @@ export interface LoginEvent {
       font-size: 0.75rem;
       font-weight: 700;
       letter-spacing: 0.05em;
-      color: #3b82f6;
+      color: #2563eb;
       background: #eff6ff;
       border: 1px solid #bfdbfe;
       padding: 0.3rem 0.8rem;
@@ -277,6 +496,7 @@ export interface LoginEvent {
       flex-direction: column;
       gap: 0.85rem;
       margin-bottom: 2.5rem;
+      padding-left: 0;
     }
     .features-list li {
       display: flex;
@@ -341,7 +561,7 @@ export interface LoginEvent {
     }
     .arrow-connector {
       font-size: 1.25rem;
-      color: #3b82f6;
+      color: #2563eb;
     }
     .hero-footer-tagline {
       font-size: 0.75rem;
@@ -350,14 +570,42 @@ export interface LoginEvent {
       color: #94a3b8;
     }
 
-    /* Login Box */
+    /* Auth Card & Tabs */
     .login-card {
       background: #ffffff;
       border-radius: 20px;
       padding: 2.5rem;
       border: 1px solid #e2e8f0;
-      box-shadow: 0 20px 40px -15px rgba(0,0,0,0.07);
+      box-shadow: 0 20px 40px -15px rgba(0,0,0,0.08);
+      transition: all 0.3s ease;
     }
+
+    .auth-tabs {
+      display: flex;
+      background: #f1f5f9;
+      padding: 4px;
+      border-radius: 12px;
+      margin-bottom: 1.75rem;
+    }
+    .auth-tab-btn {
+      flex: 1;
+      padding: 0.6rem 0.5rem;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .auth-tab-btn.active {
+      background: #ffffff;
+      color: #2563eb;
+      font-weight: 700;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
     .login-title {
       font-size: 1.65rem;
       font-weight: 800;
@@ -369,8 +617,29 @@ export interface LoginEvent {
       font-size: 0.9rem;
       color: #64748b;
       text-align: center;
-      margin-bottom: 2rem;
+      margin-bottom: 1.5rem;
     }
+
+    .alert-error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .alert-success {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      margin-bottom: 1.25rem;
+    }
+
     .pwd-header {
       display: flex;
       justify-content: space-between;
@@ -378,7 +647,7 @@ export interface LoginEvent {
     }
     .forgot-link {
       font-size: 0.8rem;
-      color: #3b82f6;
+      color: #2563eb;
     }
     .pwd-input-wrapper {
       position: relative;
@@ -392,7 +661,7 @@ export interface LoginEvent {
       font-size: 0.9rem;
     }
     .form-remember {
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.25rem;
     }
     .checkbox-label {
       display: flex;
@@ -411,7 +680,7 @@ export interface LoginEvent {
     .divider {
       text-align: center;
       position: relative;
-      margin: 1.5rem 0;
+      margin: 1.25rem 0;
     }
     .divider::before {
       content: '';
@@ -430,12 +699,11 @@ export interface LoginEvent {
       color: #94a3b8;
     }
     
-    /* Google Sign In Button */
     .btn-google-sso {
       width: 100%;
       padding: 0.85rem;
       border-radius: 10px;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1.25rem;
       background: #ffffff;
       border: 1px solid #cbd5e1;
       color: #334155;
@@ -446,11 +714,11 @@ export interface LoginEvent {
       gap: 0.75rem;
       box-shadow: 0 1px 2px rgba(0,0,0,0.05);
       transition: all 0.2s;
+      cursor: pointer;
     }
     .btn-google-sso:hover {
       background: #f8fafc;
       border-color: #94a3b8;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.08);
     }
     .google-icon {
       width: 20px;
@@ -464,7 +732,232 @@ export interface LoginEvent {
     }
     .signup-prompt a {
       font-weight: 700;
-      color: #3b82f6;
+      color: #2563eb;
+    }
+
+    /* Landing Sections Styling */
+    .landing-section {
+      padding: 5rem 2rem;
+    }
+    .bg-white { background: #ffffff; }
+    .bg-light { background: #f8fafc; }
+
+    .section-container {
+      max-width: 1150px;
+      margin: 0 auto;
+    }
+    .section-badge {
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      color: #2563eb;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+    .section-title {
+      font-size: 2.25rem;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.02em;
+    }
+    .section-subtitle {
+      font-size: 1.1rem;
+      color: #64748b;
+      max-width: 700px;
+      margin-bottom: 3rem;
+      line-height: 1.5;
+    }
+
+    /* Features Grid (Producto) */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 2rem;
+    }
+    .feature-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 2rem;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px -6px rgba(0,0,0,0.06);
+    }
+    .feature-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+    .feature-card h3 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 0.5rem;
+    }
+    .feature-card p {
+      font-size: 0.92rem;
+      color: #64748b;
+      line-height: 1.5;
+    }
+
+    /* Stats Grid (Beneficios) */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 2rem;
+    }
+    .stat-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 2rem;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+    }
+    .stat-number {
+      font-size: 2.75rem;
+      font-weight: 900;
+      color: #2563eb;
+      margin-bottom: 0.25rem;
+    }
+    .stat-label {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 0.5rem;
+    }
+    .stat-desc {
+      font-size: 0.88rem;
+      color: #64748b;
+      line-height: 1.4;
+    }
+
+    /* Resources Grid */
+    .resources-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 2rem;
+    }
+    .resource-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+    }
+    .resource-type {
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: #2563eb;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+    .resource-card h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 0.5rem;
+    }
+    .resource-card p {
+      font-size: 0.9rem;
+      color: #64748b;
+      margin-bottom: 1.5rem;
+      flex: 1;
+    }
+    .btn-link {
+      background: transparent;
+      border: none;
+      color: #2563eb;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      text-align: left;
+      padding: 0;
+    }
+
+    /* Pricing Grid */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 2rem;
+      align-items: stretch;
+    }
+    .pricing-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 2.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .pricing-card.popular {
+      border: 2px solid #2563eb;
+      box-shadow: 0 15px 30px -10px rgba(37,99,235,0.15);
+    }
+    .popular-tag {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2563eb;
+      color: #ffffff;
+      font-size: 0.7rem;
+      font-weight: 800;
+      padding: 0.25rem 0.85rem;
+      border-radius: 12px;
+      letter-spacing: 0.05em;
+    }
+    .pricing-header h3 {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .pricing-header p {
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-bottom: 1.25rem;
+    }
+    .price {
+      font-size: 2.5rem;
+      font-weight: 900;
+      color: #0f172a;
+      margin-bottom: 1.5rem;
+    }
+    .price span {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #64748b;
+    }
+    .pricing-features {
+      list-style: none;
+      padding-left: 0;
+      margin-bottom: 2rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      font-size: 0.9rem;
+      color: #334155;
+    }
+    .btn-pricing {
+      width: 100%;
+      padding: 0.85rem;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid #cbd5e1;
+      color: #0f172a;
+    }
+    .btn-outline:hover {
+      background: #f8fafc;
+      border-color: #94a3b8;
     }
 
     .landing-footer {
@@ -482,6 +975,7 @@ export interface LoginEvent {
     .footer-links a {
       color: #64748b;
       font-size: 0.85rem;
+      cursor: pointer;
     }
     .footer-copy {
       font-size: 0.85rem;
@@ -496,6 +990,7 @@ export interface LoginEvent {
       .top-nav {
         padding: 1rem 1.5rem;
       }
+      .nav-links { display: none; }
       .landing-footer {
         padding: 1rem 1.5rem;
         flex-direction: column;
@@ -513,75 +1008,139 @@ export class LandingLoginComponent {
   password: string = '';
   rememberMe: boolean = true;
   showPassword: boolean = false;
+  isLoading: boolean = false;
+  errorMessage: string = '';
+  successMessage: string = '';
 
   constructor(private apiService: ApiService) {}
 
   toggleMode(mode: 'login' | 'register'): void {
     this.isRegisterMode = mode === 'register';
+    this.errorMessage = '';
+    this.successMessage = '';
+  }
+
+  activateRegisterMode(): void {
+    this.isRegisterMode = true;
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.scrollToSection('auth-card');
+    setTimeout(() => {
+      const input = document.getElementById('name-input');
+      if (input) input.focus();
+    }, 200);
+  }
+
+  scrollToSection(sectionId: string): void {
+    const elem = document.getElementById(sectionId);
+    if (elem) {
+      elem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else if (sectionId === 'top') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
 
   onFormSubmit(): void {
+    this.errorMessage = '';
+    this.successMessage = '';
+
     let finalName = this.name.trim();
     let finalEmail = this.email.trim();
-    let finalPassword = this.password.trim() || '123456';
+    let finalPassword = this.password.trim();
 
     if (!finalEmail) {
-      finalEmail = 'ana.martinez@empresa.com';
+      this.errorMessage = 'Por favor ingresa tu correo electrónico.';
+      return;
     }
-    if (!finalName) {
+
+    if (!finalPassword) {
+      this.errorMessage = 'Por favor ingresa tu contraseña.';
+      return;
+    }
+
+    if (this.isRegisterMode && !finalName) {
       const parts = finalEmail.split('@');
       finalName = parts[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
 
+    this.isLoading = true;
+
     if (this.isRegisterMode) {
-      this.apiService.register(finalName, finalEmail, finalPassword).subscribe({
+      this.apiService.register(finalName || 'Usuario Registrado', finalEmail, finalPassword).subscribe({
         next: (res) => {
-          this.loginSuccess.emit({
-            email: res.user?.email || finalEmail,
-            name: res.user?.name || finalName
-          });
+          this.isLoading = false;
+          this.successMessage = res.message || 'Registro exitoso';
+          const token = res.access_token;
+          if (token) {
+            localStorage.setItem('nuevamente_jwt_token', token);
+          }
+          setTimeout(() => {
+            this.loginSuccess.emit({
+              email: res.user?.email || finalEmail,
+              name: res.user?.name || finalName,
+              token: token
+            });
+          }, 400);
         },
-        error: () => {
-          this.loginSuccess.emit({
-            email: finalEmail,
-            name: finalName
-          });
+        error: (err) => {
+          this.isLoading = false;
+          const detail = err?.error?.detail || 'Error al conectar con el servidor de autenticación.';
+          this.errorMessage = detail;
         }
       });
     } else {
       this.apiService.login(finalEmail, finalPassword, finalName).subscribe({
         next: (res) => {
-          this.loginSuccess.emit({
-            email: res.user?.email || finalEmail,
-            name: res.user?.name || finalName
-          });
+          this.isLoading = false;
+          this.successMessage = res.message || 'Inicio de sesión exitoso';
+          const token = res.access_token;
+          if (token) {
+            localStorage.setItem('nuevamente_jwt_token', token);
+          }
+          setTimeout(() => {
+            this.loginSuccess.emit({
+              email: res.user?.email || finalEmail,
+              name: res.user?.name || finalName,
+              token: token
+            });
+          }, 400);
         },
-        error: () => {
-          this.loginSuccess.emit({
-            email: finalEmail,
-            name: finalName
-          });
+        error: (err) => {
+          this.isLoading = false;
+          const detail = err?.error?.detail || 'Credenciales incorrectas o error en el servidor.';
+          this.errorMessage = detail;
         }
       });
     }
   }
 
   onGoogleLogin(): void {
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.isLoading = true;
+
     const googleName = this.name.trim() || 'Ana Martínez';
     const googleEmail = this.email.trim() || 'ana.martinez@gmail.com';
 
     this.apiService.googleAuth(googleEmail, googleName).subscribe({
       next: (res) => {
-        this.loginSuccess.emit({
-          email: res.user?.email || googleEmail,
-          name: res.user?.name || googleName
-        });
+        this.isLoading = false;
+        this.successMessage = 'Autenticado con Google exitosamente';
+        const token = res.access_token;
+        if (token) {
+          localStorage.setItem('nuevamente_jwt_token', token);
+        }
+        setTimeout(() => {
+          this.loginSuccess.emit({
+            email: res.user?.email || googleEmail,
+            name: res.user?.name || googleName,
+            token: token
+          });
+        }, 400);
       },
-      error: () => {
-        this.loginSuccess.emit({
-          email: googleEmail,
-          name: googleName
-        });
+      error: (err) => {
+        this.isLoading = false;
+        this.errorMessage = 'Error en autenticación de Google.';
       }
     });
   }

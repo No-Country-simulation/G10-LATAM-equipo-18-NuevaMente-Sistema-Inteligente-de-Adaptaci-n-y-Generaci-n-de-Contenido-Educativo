@@ -70,7 +70,7 @@ export class StateService {
     return this.user;
   }
 
-  setUser(email: string, name?: string): void {
+  setUser(email: string, name?: string, token?: string): void {
     const cleanEmail = email && email.trim() ? email.trim() : 'usuario@empresa.com';
     let derivedName = name && name.trim() ? name.trim() : this.extractNameFromEmail(cleanEmail);
     if (!derivedName) {
@@ -88,6 +88,9 @@ export class StateService {
 
     try {
       localStorage.setItem('nuevamente_user', JSON.stringify(this.user));
+      if (token) {
+        localStorage.setItem('nuevamente_jwt_token', token);
+      }
     } catch (e) {
       console.log('Error al persistir sesión', e);
     }
@@ -102,6 +105,7 @@ export class StateService {
     };
     try {
       localStorage.removeItem('nuevamente_user');
+      localStorage.removeItem('nuevamente_jwt_token');
     } catch (e) {
       console.log('Error al eliminar sesión', e);
     }

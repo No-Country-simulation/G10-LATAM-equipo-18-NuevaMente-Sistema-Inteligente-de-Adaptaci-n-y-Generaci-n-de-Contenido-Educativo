@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { AdaptationRequest, AdaptationResponse } from '../models/adaptation.model';
 
@@ -11,14 +11,29 @@ export class ApiService {
 
   constructor(private http: HttpClient) {}
 
+  private getHeaders(): HttpHeaders {
+    const token = localStorage.getItem('nuevamente_jwt_token');
+    if (token) {
+      return new HttpHeaders({
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      });
+    }
+    return new HttpHeaders({
+      'Content-Type': 'application/json'
+    });
+  }
+
   adaptContent(request: AdaptationRequest): Observable<AdaptationResponse> {
-    return this.http.post<AdaptationResponse>(`${this.baseUrl}/adapt-content`, request);
+    return this.http.post<AdaptationResponse>(`${this.baseUrl}/adapt-content`, request, { headers: this.getHeaders() });
   }
 
   parsePdf(file: File): Observable<{ status: string; texto_extraido: string; total_paginas: number }> {
     const formData = new FormData();
     formData.append('file', file);
-    return this.http.post<{ status: string; texto_extraido: string; total_paginas: number }>(`${this.baseUrl}/parse-pdf`, formData);
+    const token = localStorage.getItem('nuevamente_jwt_token');
+    const headers = token ? new HttpHeaders({ 'Authorization': `Bearer ${token}` }) : undefined;
+    return this.http.post<{ status: string; texto_extraido: string; total_paginas: number }>(`${this.baseUrl}/parse-pdf`, formData, { headers });
   }
 
   checkHealth(): Observable<any> {
@@ -35,6 +50,10 @@ export class ApiService {
 
   googleAuth(email?: string, name?: string): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/auth/google`, { email, name });
+  }
+
+  getMe(): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/auth/me`, { headers: this.getHeaders() });
   }
 
   generateMockResponse(request: AdaptationRequest): AdaptationResponse {

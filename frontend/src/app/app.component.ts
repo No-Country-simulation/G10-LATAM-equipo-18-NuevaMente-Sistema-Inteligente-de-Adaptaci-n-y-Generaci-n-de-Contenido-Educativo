@@ -424,8 +424,8 @@ export class AppComponent implements OnInit {
     return this.stateService.getProjects();
   }
 
-  onLoginSuccess(event: { email: string; name: string }): void {
-    this.stateService.setUser(event.email, event.name);
+  onLoginSuccess(event: { email: string; name: string; token?: string }): void {
+    this.stateService.setUser(event.email, event.name, event.token);
     this.activeView = 'dashboard';
   }
 
