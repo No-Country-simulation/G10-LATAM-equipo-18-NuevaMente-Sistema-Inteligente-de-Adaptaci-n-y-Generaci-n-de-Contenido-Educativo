@@ -25,7 +25,9 @@ load_dotenv()
 # Module-level constants used inside the class to avoid cross-field references.
 _GEMINI_EMBED_MODEL = "models/gemini-embedding-001"
 _JINA_EMBED_MODEL = "jina-embeddings-v3"
-_LOCAL_EMBED_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+# 768-dim local model, matched to EMBEDDING_DIMENSIONS below so FAISS and
+# pgvector indexes stay interchangeable regardless of which provider produced them.
+_LOCAL_EMBED_MODEL = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 
 
 class Settings(BaseModel):
@@ -62,9 +64,18 @@ class Settings(BaseModel):
     DEFAULT_EMBEDDING_MODEL: str = _GEMINI_EMBED_MODEL
     LOCAL_EMBEDDING_MODEL: str = _LOCAL_EMBED_MODEL
 
+    # Fixed output dimension enforced across every provider (Gemini, Jina, local),
+    # so FAISS and a future pgvector column always hold compatible vectors.
+    EMBEDDING_DIMENSIONS: int = int(os.getenv("EMBEDDING_DIMENSIONS", "768"))
+
+    # Number of texts sent per API call in embed_batch(). Kept conservative
+    # since the exact provider ceiling isn't confirmed; EmbeddingService
+    # halves this automatically on a batch-size related failure.
+    EMBEDDING_BATCH_SIZE: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "50"))
+
     # ── Vector Store Configuration ────────────────────────────────────────────
-    # VECTOR_STORE_METHOD: "chroma" (default) or "faiss".
-    VECTOR_STORE_METHOD: str = os.getenv("VECTOR_STORE_METHOD", "chroma")
+    # VECTOR_STORE_METHOD: "faiss" (default, local per-document index) or "pgvector".
+    VECTOR_STORE_METHOD: str = os.getenv("VECTOR_STORE_METHOD", "faiss")
     VECTOR_STORE_DIR: str = os.getenv("VECTOR_STORE_DIR", "vector_store")
 
     # ── OCI Object Storage Configuration (Always Free) ───────────────────────
@@ -83,6 +94,11 @@ class Settings(BaseModel):
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 150
     CHILD_CHUNK_SIZE: int = 150
+
+    # Extracts short key-concept tags per chunk at ingestion time (KeyBERT).
+    # Disabled by default: it loads its own local model and adds ingestion
+    # latency, so it's opt-in until measured on real documents.
+    USE_KEYBERT_CONCEPTS: bool = os.getenv("USE_KEYBERT_CONCEPTS", "false").lower() == "true"
 
     # ── Domain Profiles ───────────────────────────────────────────────────────
     PROFILE_BEGINNER: str = "beginner"
