@@ -29,6 +29,7 @@ from typing import List, Optional, Dict, Any, Union
 from pypdf import PdfReader
 from app.core.config import settings
 from app.schemas.ingestion import IngestedDocument, DocumentChunk, IngestionOptions
+from app.schemas.rag_chunks import ParentChunk, ParentChunkMetadata, ChildChunk, ChildChunkMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -407,19 +408,25 @@ class IngesterService:
             parent_id = f"parent_{idx}"
             section_title = chunk.section_title or f"Sección {idx + 1}"
 
-            parent_chunks.append({
-                "id": parent_id,
-                "title": section_title,
-                "breadcrumb": f"{document.title} > {section_title}",
-                "content": chunk.text,
-                "metadata": {
-                    "source_title": document.title,
-                    "section_index": idx,
-                    "page_number": chunk.page_number,
-                    "heading_level": chunk.heading_level,
-                    "key_concepts": self._extract_key_concepts(chunk.text),
-                },
-            })
+            # Built through the Pydantic model so a malformed field is caught
+            # here, at the source, rather than surfacing later inside FAISS
+            # or the retrieval stage. Dumped back to a dict immediately since
+            # every downstream consumer (vector store, retrieval, reranker)
+            # already operates on plain dicts.
+            parent = ParentChunk(
+                id=parent_id,
+                title=section_title,
+                breadcrumb=f"{document.title} > {section_title}",
+                content=chunk.text,
+                metadata=ParentChunkMetadata(
+                    source_title=document.title,
+                    section_index=idx,
+                    page_number=chunk.page_number,
+                    heading_level=chunk.heading_level,
+                    key_concepts=self._extract_key_concepts(chunk.text),
+                ),
+            )
+            parent_chunks.append(parent.model_dump())
 
             child_pieces = (
                 [chunk.text]
@@ -428,16 +435,17 @@ class IngesterService:
             )
 
             for child_idx, child_text in enumerate(child_pieces):
-                child_chunks.append({
-                    "id": f"{parent_id}_child_{child_idx}",
-                    "parent_id": parent_id,
-                    "breadcrumb": f"[{document.title} > {section_title}]",
-                    "content": child_text,
-                    "metadata": {
-                        "parent_id": parent_id,
-                        "source": document.title,
-                    },
-                })
+                child = ChildChunk(
+                    id=f"{parent_id}_child_{child_idx}",
+                    parent_id=parent_id,
+                    breadcrumb=f"[{document.title} > {section_title}]",
+                    content=child_text,
+                    metadata=ChildChunkMetadata(
+                        parent_id=parent_id,
+                        source=document.title,
+                    ),
+                )
+                child_chunks.append(child.model_dump())
 
         return {
             "title": document.title,
